@@ -1,38 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Standalone form view for Repair Ticket Types -->
-    <record id="view_jinstage_ticket_type_form" model="ir.ui.view">
-        <field name="name">jinstage.helpdesk.ticket.type.form</field>
+    <!-- Extend ticket type form: add repair classification flags -->
+    <record id="view_helpdesk_ticket_type_repair_form" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.type.repair.form</field>
         <field name="model">helpdesk.ticket.type</field>
+        <field name="inherit_id" ref="helpdesk.helpdesk_ticket_type_view_form"/>
         <field name="arch" type="xml">
-            <form string="Ticket Type">
-                <sheet>
-                    <group>
-                        <field name="name"/>
-                    </group>
-                    <group string="Repair Classification">
-                        <field name="is_rug" string="RUG / Under Warranty"/>
-                        <field name="is_rug_confirmed" string="RUG Confirmed (Full Approval Workflow)"/>
-                        <field name="is_with_serial_no" string="Requires Serial Number Tracking"/>
-                        <field name="is_without_serial_no" string="No Serial Number Required"/>
-                    </group>
-                </sheet>
-            </form>
+            <xpath expr="//field[@name='name']" position="after">
+                <separator string="Repair Classification"/>
+                <field name="is_rug" string="RUG / Under Warranty"/>
+                <field name="is_rug_confirmed" string="RUG Confirmed (Full Approval Workflow)"/>
+                <field name="is_with_serial_no" string="Requires Serial Number Tracking"/>
+                <field name="is_without_serial_no" string="No Serial Number Required"/>
+            </xpath>
         </field>
     </record>
 
-    <!-- Standalone list view for Repair Ticket Types -->
-    <record id="view_jinstage_ticket_type_list" model="ir.ui.view">
-        <field name="name">jinstage.helpdesk.ticket.type.list</field>
+    <!-- Extend ticket type tree: add repair classification columns -->
+    <record id="view_helpdesk_ticket_type_repair_tree" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.type.repair.tree</field>
         <field name="model">helpdesk.ticket.type</field>
+        <field name="inherit_id" ref="helpdesk.helpdesk_ticket_type_view_tree"/>
         <field name="arch" type="xml">
-            <list string="Ticket Types">
-                <field name="name"/>
-                <field name="is_rug" string="RUG/Warranty"/>
-                <field name="is_rug_confirmed" string="RUG Confirmed"/>
-                <field name="is_with_serial_no" string="With Serial No"/>
-                <field name="is_without_serial_no" string="Without Serial No"/>
-            </list>
+            <xpath expr="//tree" position="inside">
+                <field name="is_rug" string="RUG/Warranty" optional="show"/>
+                <field name="is_rug_confirmed" string="RUG Confirmed" optional="show"/>
+                <field name="is_with_serial_no" string="With Serial No" optional="show"/>
+                <field name="is_without_serial_no" string="Without Serial No" optional="show"/>
+            </xpath>
         </field>
     </record>
 </odoo>

@@ -239,10 +239,10 @@
     <record id="view_helpdesk_ticket_repair_list" model="ir.ui.view">
         <field name="name">helpdesk.ticket.repair.list</field>
         <field name="model">helpdesk.ticket</field>
-        <field name="inherit_id" ref="helpdesk.helpdesk_tickets_view_list"/>
+        <field name="inherit_id" ref="helpdesk.helpdesk_tickets_view_tree"/>
         <field name="priority">900</field>
         <field name="arch" type="xml">
-            <xpath expr="//list" position="inside">
+            <xpath expr="//tree" position="inside">
                 <field name="rug_repair" optional="show"/>
                 <field name="normal_repair_with_serial_no" optional="show"/>
                 <field name="repair_serial_no" optional="show"/>

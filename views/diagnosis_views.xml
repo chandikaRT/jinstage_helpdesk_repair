@@ -8,11 +8,11 @@
         <field name="name">jinstage.repair.symptom.area.list</field>
         <field name="model">jinstage.repair.symptom.area</field>
         <field name="arch" type="xml">
-            <list editable="top">
+            <tree editable="top">
                 <field name="name"/>
                 <field name="code"/>
                 <field name="active" optional="show"/>
-            </list>
+            </tree>
         </field>
     </record>
 
@@ -42,12 +42,12 @@
         <field name="name">jinstage.repair.symptom.code.list</field>
         <field name="model">jinstage.repair.symptom.code</field>
         <field name="arch" type="xml">
-            <list editable="top">
+            <tree editable="top">
                 <field name="name"/>
                 <field name="code"/>
                 <field name="symptom_area_id"/>
                 <field name="active" optional="show"/>
-            </list>
+            </tree>
         </field>
     </record>
 
@@ -78,11 +78,11 @@
         <field name="name">jinstage.repair.condition.list</field>
         <field name="model">jinstage.repair.condition</field>
         <field name="arch" type="xml">
-            <list editable="top">
+            <tree editable="top">
                 <field name="name"/>
                 <field name="code"/>
                 <field name="active" optional="show"/>
-            </list>
+            </tree>
         </field>
     </record>
 
@@ -112,11 +112,11 @@
         <field name="name">jinstage.repair.diagnosis.area.list</field>
         <field name="model">jinstage.repair.diagnosis.area</field>
         <field name="arch" type="xml">
-            <list editable="top">
+            <tree editable="top">
                 <field name="name"/>
                 <field name="code"/>
                 <field name="active" optional="show"/>
-            </list>
+            </tree>
         </field>
     </record>
 
@@ -146,12 +146,12 @@
         <field name="name">jinstage.repair.diagnosis.code.list</field>
         <field name="model">jinstage.repair.diagnosis.code</field>
         <field name="arch" type="xml">
-            <list editable="top">
+            <tree editable="top">
                 <field name="name"/>
                 <field name="code"/>
                 <field name="diagnosis_area_id"/>
                 <field name="active" optional="show"/>
-            </list>
+            </tree>
         </field>
     </record>
 
@@ -182,11 +182,11 @@
         <field name="name">jinstage.repair.reason.list</field>
         <field name="model">jinstage.repair.reason</field>
         <field name="arch" type="xml">
-            <list editable="top">
+            <tree editable="top">
                 <field name="name"/>
                 <field name="code"/>
                 <field name="active" optional="show"/>
-            </list>
+            </tree>
         </field>
     </record>
 
@@ -216,11 +216,11 @@
         <field name="name">jinstage.repair.reason.customer.list</field>
         <field name="model">jinstage.repair.reason.customer</field>
         <field name="arch" type="xml">
-            <list editable="top">
+            <tree editable="top">
                 <field name="name"/>
                 <field name="code"/>
                 <field name="active" optional="show"/>
-            </list>
+            </tree>
         </field>
     </record>
 
@@ -250,12 +250,12 @@
         <field name="name">jinstage.repair.sub.reason.list</field>
         <field name="model">jinstage.repair.sub.reason</field>
         <field name="arch" type="xml">
-            <list editable="top">
+            <tree editable="top">
                 <field name="name"/>
                 <field name="code"/>
                 <field name="reason_id"/>
                 <field name="active" optional="show"/>
-            </list>
+            </tree>
         </field>
     </record>
 
@@ -286,11 +286,11 @@
         <field name="name">jinstage.repair.resolution.list</field>
         <field name="model">jinstage.repair.resolution</field>
         <field name="arch" type="xml">
-            <list editable="top">
+            <tree editable="top">
                 <field name="name"/>
                 <field name="code"/>
                 <field name="active" optional="show"/>
-            </list>
+            </tree>
         </field>
     </record>
 

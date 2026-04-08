@@ -18,17 +18,17 @@
         </field>
     </record>
 
-    <!-- Standalone list view for Repair Stages -->
-    <record id="view_jinstage_stage_list" model="ir.ui.view">
-        <field name="name">jinstage.helpdesk.stage.list</field>
+    <!-- Standalone tree/list view for Repair Stages -->
+    <record id="view_jinstage_stage_tree" model="ir.ui.view">
+        <field name="name">jinstage.helpdesk.stage.tree</field>
         <field name="model">helpdesk.stage</field>
         <field name="arch" type="xml">
-            <list string="Stages">
+            <tree string="Stages">
                 <field name="name"/>
                 <field name="sequence"/>
                 <field name="company_id" optional="show"/>
                 <field name="fold"/>
-            </list>
+            </tree>
         </field>
     </record>
 </odoo>
