@@ -3,7 +3,7 @@
     <!-- Configuration: Repair Ticket Types -->
     <menuitem id="menu_jinstage_ticket_types"
               name="Repair Ticket Types"
-              parent="helpdesk.helpdesk_menu_configuration"
+              parent="helpdesk.helpdesk_menu_config"
               sequence="25"
               action="action_jinstage_ticket_types"
               groups="helpdesk.group_helpdesk_manager"/>
@@ -11,7 +11,7 @@
     <!-- Configuration: Repair Stages -->
     <menuitem id="menu_jinstage_stages"
               name="Repair Stages"
-              parent="helpdesk.helpdesk_menu_configuration"
+              parent="helpdesk.helpdesk_menu_config"
               sequence="26"
               action="action_jinstage_stages"
               groups="helpdesk.group_helpdesk_manager"/>
@@ -19,7 +19,7 @@
     <!-- Configuration: Repair Diagnosis root menu -->
     <menuitem id="menu_repair_diagnosis_root"
               name="Repair Diagnosis"
-              parent="helpdesk.helpdesk_menu_configuration"
+              parent="helpdesk.helpdesk_menu_config"
               sequence="20"
               groups="helpdesk.group_helpdesk_manager"/>
 
@@ -73,23 +73,23 @@
     <!-- Reporting menus -->
     <menuitem id="menu_repair_job_details"
               name="Repair Job Details"
-              parent="helpdesk.helpdesk_menu_reporting"
+              parent="helpdesk.helpdesk_ticket_report_menu_main"
               sequence="3"
               action="action_repair_job_details"/>
     <menuitem id="menu_repair_so_list"
               name="Repair Sales Order List"
-              parent="helpdesk.helpdesk_menu_reporting"
+              parent="helpdesk.helpdesk_ticket_report_menu_main"
               sequence="4"
               action="action_repair_so_list"/>
     <menuitem id="menu_repair_job_details_rug"
               name="Repair Job Details - RUG Only"
-              parent="helpdesk.helpdesk_menu_reporting"
+              parent="helpdesk.helpdesk_ticket_report_menu_main"
               sequence="5"
               action="action_repair_job_details_rug"
               active="False"/>
     <menuitem id="menu_customer_letter_report"
               name="Customer Letter Report"
-              parent="helpdesk.helpdesk_menu_reporting"
+              parent="helpdesk.helpdesk_ticket_report_menu_main"
               sequence="6"
               action="action_customer_letter_report"
               active="False"/>
