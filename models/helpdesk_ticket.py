@@ -34,7 +34,7 @@ class HelpdeskTicket(models.Model):
     picking_id = fields.Many2one('stock.picking', string='Picking', ondelete='set null')
     sale_order = fields.Many2one(
         'sale.order', string='Sale Order',
-        compute='_compute_sale_order', store=True
+        compute='_compute_sale_order', store=False
     )
     driver_name = fields.Char(string='Driver Name')
     vehicle_details = fields.Char(string='Vehicle Details')
@@ -176,17 +176,25 @@ class HelpdeskTicket(models.Model):
     # COMPUTED FIELDS
     # =========================================================================
 
-    @api.depends('task_ids', 'task_ids.stage_id', 'task_ids.stage_id.is_closed')
+    @api.depends()
     def _compute_fsm_task_done(self):
+        has_task_ids = 'task_ids' in self.env['helpdesk.ticket']._fields
         for ticket in self:
+            if not has_task_ids:
+                ticket.fsm_task_done = False
+                continue
             tasks = ticket.task_ids
             ticket.fsm_task_done = bool(tasks) and all(
                 t.stage_id.is_closed for t in tasks
             )
 
-    @api.depends('task_ids', 'task_ids.sale_order_id')
+    @api.depends()
     def _compute_sale_order(self):
+        has_task_ids = 'task_ids' in self.env['helpdesk.ticket']._fields
         for ticket in self:
+            if not has_task_ids:
+                ticket.sale_order = False
+                continue
             sale_orders = ticket.task_ids.mapped('sale_order_id')
             ticket.sale_order = sale_orders[:1] if sale_orders else False
 
