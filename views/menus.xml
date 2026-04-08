@@ -1,5 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <!-- Configuration: Repair Ticket Types -->
+    <menuitem id="menu_jinstage_ticket_types"
+              name="Repair Ticket Types"
+              parent="helpdesk.helpdesk_menu_configuration"
+              sequence="25"
+              action="action_jinstage_ticket_types"
+              groups="helpdesk.group_helpdesk_manager"/>
+
+    <!-- Configuration: Repair Stages -->
+    <menuitem id="menu_jinstage_stages"
+              name="Repair Stages"
+              parent="helpdesk.helpdesk_menu_configuration"
+              sequence="26"
+              action="action_jinstage_stages"
+              groups="helpdesk.group_helpdesk_manager"/>
+
     <!-- Configuration: Repair Diagnosis root menu -->
     <menuitem id="menu_repair_diagnosis_root"
               name="Repair Diagnosis"

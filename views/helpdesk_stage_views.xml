@@ -1,26 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Stage Form: add company_id field -->
-    <record id="view_helpdesk_stage_repair_form" model="ir.ui.view">
-        <field name="name">helpdesk.stage.repair.form</field>
+    <!-- Standalone form view for Repair Stages (includes company_id) -->
+    <record id="view_jinstage_stage_form" model="ir.ui.view">
+        <field name="name">jinstage.helpdesk.stage.form</field>
         <field name="model">helpdesk.stage</field>
-        <field name="inherit_id" ref="helpdesk.helpdesk_stage_view_form"/>
         <field name="arch" type="xml">
-            <xpath expr="//field[@name='name']" position="after">
-                <field name="company_id"/>
-            </xpath>
+            <form string="Stage">
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                        <field name="sequence"/>
+                        <field name="company_id"/>
+                        <field name="fold"/>
+                    </group>
+                </sheet>
+            </form>
         </field>
     </record>
 
-    <!-- Stage List: add company_id column -->
-    <record id="view_helpdesk_stage_repair_list" model="ir.ui.view">
-        <field name="name">helpdesk.stage.repair.list</field>
+    <!-- Standalone list view for Repair Stages -->
+    <record id="view_jinstage_stage_list" model="ir.ui.view">
+        <field name="name">jinstage.helpdesk.stage.list</field>
         <field name="model">helpdesk.stage</field>
-        <field name="inherit_id" ref="helpdesk.helpdesk_stage_view_list"/>
         <field name="arch" type="xml">
-            <xpath expr="//list" position="inside">
+            <list string="Stages">
+                <field name="name"/>
+                <field name="sequence"/>
                 <field name="company_id" optional="show"/>
-            </xpath>
+                <field name="fold"/>
+            </list>
         </field>
     </record>
 </odoo>

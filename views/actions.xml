@@ -59,6 +59,23 @@
     </record>
 
     <!-- ============================================================
+         TICKET TYPE & STAGE CONFIGURATION ACTIONS
+         ============================================================ -->
+    <record id="action_jinstage_ticket_types" model="ir.actions.act_window">
+        <field name="name">Repair Ticket Types</field>
+        <field name="res_model">helpdesk.ticket.type</field>
+        <field name="view_mode">list,form</field>
+        <field name="views" eval="[(ref('view_jinstage_ticket_type_list'), 'list'), (ref('view_jinstage_ticket_type_form'), 'form')]"/>
+    </record>
+
+    <record id="action_jinstage_stages" model="ir.actions.act_window">
+        <field name="name">Repair Stages</field>
+        <field name="res_model">helpdesk.stage</field>
+        <field name="view_mode">list,form</field>
+        <field name="views" eval="[(ref('view_jinstage_stage_list'), 'list'), (ref('view_jinstage_stage_form'), 'form')]"/>
+    </record>
+
+    <!-- ============================================================
          REPORTING ACTIONS
          ============================================================ -->
     <record id="action_repair_job_details" model="ir.actions.act_window">
