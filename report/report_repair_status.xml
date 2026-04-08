@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_repair_status">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <h2>Repair Status Report</h2>
+                        <h4 t-field="doc.name"/>
+                        <div class="row">
+                            <div class="col-6">
+                                <strong>Customer:</strong> <span t-field="doc.partner_id"/><br/>
+                                <strong>Ticket Type:</strong> <span t-field="doc.ticket_type_id"/><br/>
+                                <strong>Stage:</strong> <span t-field="doc.stage_id"/><br/>
+                                <strong>Stage Date:</strong> <span t-field="doc.stage_date"/>
+                            </div>
+                            <div class="col-6">
+                                <strong>RUG Repair:</strong>
+                                <span t-if="doc.rug_repair">Yes</span><span t-else="">No</span><br/>
+                                <strong>RUG Approval:</strong> <span t-field="doc.rug_approval_status"/><br/>
+                                <strong>Material Availability:</strong> <span t-field="doc.material_availability"/>
+                            </div>
+                        </div>
+                        <table class="table table-sm mt-3">
+                            <thead>
+                                <tr>
+                                    <th>Movement</th>
+                                    <th>Status</th>
+                                    <th>By</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Send to Centre</td>
+                                    <td>
+                                        <span t-if="doc.send_to_centre">Done</span>
+                                        <span t-else="">Pending</span>
+                                    </td>
+                                    <td t-field="doc.s_shipped_by"/>
+                                </tr>
+                                <tr>
+                                    <td>Receive at Centre</td>
+                                    <td>
+                                        <span t-if="doc.receive_at_centre">Done</span>
+                                        <span t-else="">Pending</span>
+                                    </td>
+                                    <td t-field="doc.s_received_by"/>
+                                </tr>
+                                <tr>
+                                    <td>Send to Factory</td>
+                                    <td>
+                                        <span t-if="doc.send_to_factory">Done</span>
+                                        <span t-else="">Pending</span>
+                                    </td>
+                                    <td t-field="doc.f_shipped_by"/>
+                                </tr>
+                                <tr>
+                                    <td>Receive at Factory</td>
+                                    <td>
+                                        <span t-if="doc.receive_at_factory">Done</span>
+                                        <span t-else="">Pending</span>
+                                    </td>
+                                    <td t-field="doc.f_received_by"/>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

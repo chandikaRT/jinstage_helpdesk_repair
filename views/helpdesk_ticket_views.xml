@@ -1,0 +1,258 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ============================================================
+         1. FORM VIEW EXTENSION
+         ============================================================ -->
+    <record id="view_helpdesk_ticket_repair_form" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.repair.form</field>
+        <field name="model">helpdesk.ticket</field>
+        <field name="inherit_id" ref="helpdesk.helpdesk_ticket_view_form"/>
+        <field name="arch" type="xml">
+
+            <!-- Hidden fields needed for domain/invisible expressions -->
+            <xpath expr="//header" position="before">
+                <field name="picking_count" invisible="1"/>
+                <field name="send_to_centre" invisible="1"/>
+                <field name="receive_at_centre" invisible="1"/>
+                <field name="send_to_factory" invisible="1"/>
+                <field name="receive_at_factory" invisible="1"/>
+                <field name="rug_repair" invisible="1"/>
+                <field name="rug_confirmed" invisible="1"/>
+                <field name="rug_request_sent" invisible="1"/>
+                <field name="rug_approved" invisible="1"/>
+                <field name="cancelled" invisible="1"/>
+                <field name="repair_serial_created" invisible="1"/>
+                <field name="normal_repair_without_serial_no" invisible="1"/>
+            </xpath>
+
+            <!-- Action Buttons in header -->
+            <xpath expr="//header" position="inside">
+                <button name="action_create_repair_route"
+                        string="Create Repair Route"
+                        type="object"
+                        class="btn-primary"
+                        invisible="picking_count > 0"/>
+                <button name="action_send_to_centre"
+                        string="Send to Centre"
+                        type="object"
+                        class="btn-secondary"
+                        invisible="send_to_centre or picking_count == 0"/>
+                <button name="action_receive_at_centre"
+                        string="Receive at Centre"
+                        type="object"
+                        class="btn-secondary"
+                        invisible="receive_at_centre or not send_to_centre"/>
+                <button name="action_send_to_factory"
+                        string="Send to Factory"
+                        type="object"
+                        class="btn-secondary"
+                        invisible="send_to_factory or not receive_at_centre"/>
+                <button name="action_receive_at_factory"
+                        string="Receive at Factory"
+                        type="object"
+                        class="btn-secondary"
+                        invisible="receive_at_factory or not send_to_factory"/>
+                <button name="action_send_rug_request"
+                        string="Send RUG Request"
+                        type="object"
+                        class="btn-secondary"
+                        invisible="not rug_confirmed or rug_request_sent"/>
+                <button name="action_approve_rug"
+                        string="Approve RUG"
+                        type="object"
+                        class="btn-success"
+                        groups="helpdesk.group_helpdesk_manager"
+                        invisible="not rug_confirmed or not rug_request_sent or rug_approved"/>
+                <button name="action_reject_rug"
+                        string="Reject RUG"
+                        type="object"
+                        class="btn-danger"
+                        groups="helpdesk.group_helpdesk_manager"
+                        invisible="not rug_confirmed or not rug_request_sent or rug_approved"/>
+                <button name="action_cancel_ticket"
+                        string="Cancel"
+                        type="object"
+                        class="btn-secondary"
+                        invisible="cancelled"/>
+                <button name="action_reopen_ticket"
+                        string="Reopen"
+                        type="object"
+                        class="btn-secondary"
+                        invisible="not cancelled"/>
+                <button name="action_view_pickings"
+                        string="Receipt"
+                        type="object"
+                        class="btn-secondary"
+                        invisible="not picking_count"/>
+            </xpath>
+
+            <!-- Smart Button: Pickings -->
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_view_pickings"
+                        type="object"
+                        class="oe_stat_button"
+                        icon="fa-truck"
+                        invisible="not picking_count">
+                    <field name="picking_count" widget="statinfo" string="Pickings"/>
+                </button>
+            </xpath>
+
+            <!-- Repair Info tab: inject before description tab in notebook -->
+            <xpath expr="//notebook/page[1]" position="before">
+                <page name="repair_info" string="Repair Info">
+                    <group string="Repair Classification">
+                        <field name="rug_repair" readonly="1"/>
+                        <field name="rug_confirmed" readonly="1"/>
+                        <field name="normal_repair_with_serial_no" readonly="1"/>
+                        <field name="normal_repair_without_serial_no" readonly="1"/>
+                    </group>
+                    <group string="Serial Number"
+                           invisible="normal_repair_without_serial_no">
+                        <field name="repair_serial_no"/>
+                        <field name="repair_serial_created" readonly="1"/>
+                        <field name="sn_updated" readonly="1"/>
+                    </group>
+                    <group string="Logistics">
+                        <field name="driver_name"/>
+                        <field name="vehicle_details"/>
+                    </group>
+                    <group string="Financial">
+                        <field name="balance_due"/>
+                        <field name="sales_price"/>
+                        <field name="unit_price"/>
+                        <field name="quantity"/>
+                        <field name="qty"/>
+                    </group>
+                    <group string="Items">
+                        <field name="items" widget="many2many_tags" nolabel="1"/>
+                    </group>
+                    <group string="Documents">
+                        <field name="warranty_card" widget="image" nolabel="1"/>
+                        <field name="related_information" widget="image" nolabel="1"/>
+                    </group>
+                </page>
+            </xpath>
+
+            <!-- Extra Info tab: inject additional repair fields -->
+            <xpath expr="//page[@name='extra_info']" position="inside">
+                <separator string="Repair Locations"/>
+                <group>
+                    <field name="repair_location"/>
+                    <field name="return_receipt_location"/>
+                    <field name="source_location"/>
+                    <field name="job_location"/>
+                </group>
+                <separator string="Workflow Status"/>
+                <group>
+                    <field name="quick_repair_status"/>
+                    <field name="material_availability"/>
+                    <field name="rug_approval_status"/>
+                    <field name="re_estimate_status"/>
+                    <field name="stage_date" readonly="1"/>
+                    <field name="user_location_validation" readonly="1"/>
+                </group>
+                <separator string="Movement Flags"/>
+                <group>
+                    <field name="send_to_centre" readonly="1"/>
+                    <field name="receive_at_centre" readonly="1"/>
+                    <field name="send_to_factory" readonly="1"/>
+                    <field name="receive_at_factory" readonly="1"/>
+                    <field name="handed_over" readonly="1"/>
+                    <field name="fsm_task_done" readonly="1"/>
+                </group>
+                <separator string="Sale Order Status"/>
+                <group>
+                    <field name="sale_order" readonly="1"/>
+                    <field name="valid_confirmed_so"/>
+                    <field name="valid_delivered_so"/>
+                    <field name="valid_invoiced_so"/>
+                    <field name="invoice_stage_updated" readonly="1"/>
+                </group>
+                <separator string="User Tracking"/>
+                <group>
+                    <field name="s_shipped_by" readonly="1"/>
+                    <field name="s_received_by" readonly="1"/>
+                    <field name="f_shipped_by" readonly="1"/>
+                    <field name="f_received_by" readonly="1"/>
+                </group>
+            </xpath>
+
+            <!-- Cancel/Reopen Log tab: add at end of notebook -->
+            <xpath expr="//notebook" position="inside">
+                <page name="cancel_reopen_log" string="Cancel / Reopen Log">
+                    <group string="Cancellation">
+                        <field name="cancelled" readonly="1"/>
+                        <field name="cancel_status"/>
+                        <field name="cancelled_date" readonly="1"/>
+                        <field name="cancelled_by" readonly="1"/>
+                        <field name="cancelled_stage_id" readonly="1"/>
+                    </group>
+                    <group string="Reopen">
+                        <field name="reopen_status"/>
+                        <field name="reopened_date" readonly="1"/>
+                        <field name="reopened_by" readonly="1"/>
+                    </group>
+                </page>
+            </xpath>
+
+        </field>
+    </record>
+
+    <!-- ============================================================
+         2. KANBAN VIEW EXTENSION
+         ============================================================ -->
+    <record id="view_helpdesk_ticket_repair_kanban" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.repair.kanban</field>
+        <field name="model">helpdesk.ticket</field>
+        <field name="inherit_id" ref="helpdesk.helpdesk_ticket_view_kanban"/>
+        <field name="arch" type="xml">
+            <xpath expr="//kanban/field[last()]" position="after">
+                <field name="rug_repair"/>
+                <field name="rug_confirmed"/>
+                <field name="normal_repair_with_serial_no"/>
+                <field name="normal_repair_without_serial_no"/>
+                <field name="rug_approval_status"/>
+            </xpath>
+            <xpath expr="//div[hasclass('oe_kanban_bottom_left')]" position="inside">
+                <t t-if="record.rug_confirmed.raw_value">
+                    <span class="badge bg-warning text-dark me-1">RUG Confirmed</span>
+                    <span class="badge bg-info text-dark me-1" t-att-title="record.rug_approval_status.value">
+                        <t t-esc="record.rug_approval_status.value"/>
+                    </span>
+                </t>
+                <t t-elif="record.rug_repair.raw_value">
+                    <span class="badge bg-secondary me-1">RUG</span>
+                </t>
+                <t t-elif="record.normal_repair_with_serial_no.raw_value">
+                    <span class="badge bg-primary me-1">W/ Serial</span>
+                </t>
+                <t t-elif="record.normal_repair_without_serial_no.raw_value">
+                    <span class="badge bg-light text-dark border me-1">No Serial</span>
+                </t>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         3. LIST VIEW EXTENSION
+         ============================================================ -->
+    <record id="view_helpdesk_ticket_repair_list" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.repair.list</field>
+        <field name="model">helpdesk.ticket</field>
+        <field name="inherit_id" ref="helpdesk.helpdesk_tickets_view_list"/>
+        <field name="priority">900</field>
+        <field name="arch" type="xml">
+            <xpath expr="//list" position="inside">
+                <field name="rug_repair" optional="show"/>
+                <field name="normal_repair_with_serial_no" optional="show"/>
+                <field name="repair_serial_no" optional="show"/>
+                <field name="repair_location" optional="show"/>
+                <field name="rug_approval_status" optional="show"/>
+                <field name="material_availability" optional="show"/>
+                <field name="balance_due" optional="show"/>
+                <field name="stage_date" optional="show"/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

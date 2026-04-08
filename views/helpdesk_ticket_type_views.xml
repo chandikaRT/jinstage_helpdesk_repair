@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_helpdesk_ticket_type_repair_tree" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.type.repair.tree</field>
+        <field name="model">helpdesk.ticket.type</field>
+        <field name="inherit_id" ref="helpdesk.helpdesk_ticket_type_view_list"/>
+        <field name="arch" type="xml">
+            <xpath expr="//list" position="inside">
+                <field name="is_rug" optional="show"/>
+                <field name="is_rug_confirmed" optional="show"/>
+                <field name="is_with_serial_no" optional="show"/>
+                <field name="is_without_serial_no" optional="show"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

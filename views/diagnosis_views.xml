@@ -1,0 +1,316 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ============================================================
+         SYMPTOM AREA
+         ============================================================ -->
+    <record id="view_jinstage_repair_symptom_area_list" model="ir.ui.view">
+        <field name="name">jinstage.repair.symptom.area.list</field>
+        <field name="model">jinstage.repair.symptom.area</field>
+        <field name="arch" type="xml">
+            <list editable="top">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="active" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_jinstage_repair_symptom_area_form" model="ir.ui.view">
+        <field name="name">jinstage.repair.symptom.area.form</field>
+        <field name="model">jinstage.repair.symptom.area</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                        <field name="code"/>
+                        <field name="active"/>
+                    </group>
+                    <group string="Description">
+                        <field name="description" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         SYMPTOM CODE
+         ============================================================ -->
+    <record id="view_jinstage_repair_symptom_code_list" model="ir.ui.view">
+        <field name="name">jinstage.repair.symptom.code.list</field>
+        <field name="model">jinstage.repair.symptom.code</field>
+        <field name="arch" type="xml">
+            <list editable="top">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="symptom_area_id"/>
+                <field name="active" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_jinstage_repair_symptom_code_form" model="ir.ui.view">
+        <field name="name">jinstage.repair.symptom.code.form</field>
+        <field name="model">jinstage.repair.symptom.code</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                        <field name="code"/>
+                        <field name="symptom_area_id"/>
+                        <field name="active"/>
+                    </group>
+                    <group string="Description">
+                        <field name="description" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         CONDITION
+         ============================================================ -->
+    <record id="view_jinstage_repair_condition_list" model="ir.ui.view">
+        <field name="name">jinstage.repair.condition.list</field>
+        <field name="model">jinstage.repair.condition</field>
+        <field name="arch" type="xml">
+            <list editable="top">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="active" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_jinstage_repair_condition_form" model="ir.ui.view">
+        <field name="name">jinstage.repair.condition.form</field>
+        <field name="model">jinstage.repair.condition</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                        <field name="code"/>
+                        <field name="active"/>
+                    </group>
+                    <group string="Description">
+                        <field name="description" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         DIAGNOSIS AREA
+         ============================================================ -->
+    <record id="view_jinstage_repair_diagnosis_area_list" model="ir.ui.view">
+        <field name="name">jinstage.repair.diagnosis.area.list</field>
+        <field name="model">jinstage.repair.diagnosis.area</field>
+        <field name="arch" type="xml">
+            <list editable="top">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="active" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_jinstage_repair_diagnosis_area_form" model="ir.ui.view">
+        <field name="name">jinstage.repair.diagnosis.area.form</field>
+        <field name="model">jinstage.repair.diagnosis.area</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                        <field name="code"/>
+                        <field name="active"/>
+                    </group>
+                    <group string="Description">
+                        <field name="description" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         DIAGNOSIS CODE
+         ============================================================ -->
+    <record id="view_jinstage_repair_diagnosis_code_list" model="ir.ui.view">
+        <field name="name">jinstage.repair.diagnosis.code.list</field>
+        <field name="model">jinstage.repair.diagnosis.code</field>
+        <field name="arch" type="xml">
+            <list editable="top">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="diagnosis_area_id"/>
+                <field name="active" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_jinstage_repair_diagnosis_code_form" model="ir.ui.view">
+        <field name="name">jinstage.repair.diagnosis.code.form</field>
+        <field name="model">jinstage.repair.diagnosis.code</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                        <field name="code"/>
+                        <field name="diagnosis_area_id"/>
+                        <field name="active"/>
+                    </group>
+                    <group string="Description">
+                        <field name="description" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         REPAIR REASON
+         ============================================================ -->
+    <record id="view_jinstage_repair_reason_list" model="ir.ui.view">
+        <field name="name">jinstage.repair.reason.list</field>
+        <field name="model">jinstage.repair.reason</field>
+        <field name="arch" type="xml">
+            <list editable="top">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="active" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_jinstage_repair_reason_form" model="ir.ui.view">
+        <field name="name">jinstage.repair.reason.form</field>
+        <field name="model">jinstage.repair.reason</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                        <field name="code"/>
+                        <field name="active"/>
+                    </group>
+                    <group string="Description">
+                        <field name="description" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         REPAIR REASON CUSTOMER
+         ============================================================ -->
+    <record id="view_jinstage_repair_reason_customer_list" model="ir.ui.view">
+        <field name="name">jinstage.repair.reason.customer.list</field>
+        <field name="model">jinstage.repair.reason.customer</field>
+        <field name="arch" type="xml">
+            <list editable="top">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="active" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_jinstage_repair_reason_customer_form" model="ir.ui.view">
+        <field name="name">jinstage.repair.reason.customer.form</field>
+        <field name="model">jinstage.repair.reason.customer</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                        <field name="code"/>
+                        <field name="active"/>
+                    </group>
+                    <group string="Description">
+                        <field name="description" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         REPAIR SUB REASON
+         ============================================================ -->
+    <record id="view_jinstage_repair_sub_reason_list" model="ir.ui.view">
+        <field name="name">jinstage.repair.sub.reason.list</field>
+        <field name="model">jinstage.repair.sub.reason</field>
+        <field name="arch" type="xml">
+            <list editable="top">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="reason_id"/>
+                <field name="active" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_jinstage_repair_sub_reason_form" model="ir.ui.view">
+        <field name="name">jinstage.repair.sub.reason.form</field>
+        <field name="model">jinstage.repair.sub.reason</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                        <field name="code"/>
+                        <field name="reason_id"/>
+                        <field name="active"/>
+                    </group>
+                    <group string="Description">
+                        <field name="description" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         RESOLUTION
+         ============================================================ -->
+    <record id="view_jinstage_repair_resolution_list" model="ir.ui.view">
+        <field name="name">jinstage.repair.resolution.list</field>
+        <field name="model">jinstage.repair.resolution</field>
+        <field name="arch" type="xml">
+            <list editable="top">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="active" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_jinstage_repair_resolution_form" model="ir.ui.view">
+        <field name="name">jinstage.repair.resolution.form</field>
+        <field name="model">jinstage.repair.resolution</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                        <field name="code"/>
+                        <field name="active"/>
+                    </group>
+                    <group string="Description">
+                        <field name="description" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+</odoo>

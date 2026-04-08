@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ============================================================
+         DIAGNOSIS MODEL ACTIONS
+         ============================================================ -->
+    <record id="action_repair_symptom_area" model="ir.actions.act_window">
+        <field name="name">Symptom Areas</field>
+        <field name="res_model">jinstage.repair.symptom.area</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="action_repair_symptom_code" model="ir.actions.act_window">
+        <field name="name">Symptom Codes</field>
+        <field name="res_model">jinstage.repair.symptom.code</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="action_repair_condition" model="ir.actions.act_window">
+        <field name="name">Conditions</field>
+        <field name="res_model">jinstage.repair.condition</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="action_repair_diagnosis_area" model="ir.actions.act_window">
+        <field name="name">Diagnosis Areas</field>
+        <field name="res_model">jinstage.repair.diagnosis.area</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="action_repair_diagnosis_code" model="ir.actions.act_window">
+        <field name="name">Diagnosis Codes</field>
+        <field name="res_model">jinstage.repair.diagnosis.code</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="action_repair_reason" model="ir.actions.act_window">
+        <field name="name">Repair Reasons</field>
+        <field name="res_model">jinstage.repair.reason</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="action_repair_reason_customer" model="ir.actions.act_window">
+        <field name="name">Repair Reasons - Customer</field>
+        <field name="res_model">jinstage.repair.reason.customer</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="action_repair_sub_reason" model="ir.actions.act_window">
+        <field name="name">Repair Sub Reasons</field>
+        <field name="res_model">jinstage.repair.sub.reason</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="action_repair_resolution" model="ir.actions.act_window">
+        <field name="name">Resolutions</field>
+        <field name="res_model">jinstage.repair.resolution</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- ============================================================
+         REPORTING ACTIONS
+         ============================================================ -->
+    <record id="action_repair_job_details" model="ir.actions.act_window">
+        <field name="name">Repair Job Details</field>
+        <field name="res_model">helpdesk.ticket</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_my_team': 0}</field>
+    </record>
+
+    <record id="action_repair_so_list" model="ir.actions.act_window">
+        <field name="name">Repair Sales Order List</field>
+        <field name="res_model">helpdesk.ticket</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('sale_order', '!=', False)]</field>
+    </record>
+
+    <record id="action_repair_job_details_rug" model="ir.actions.act_window">
+        <field name="name">Repair Job Details - RUG Only</field>
+        <field name="res_model">helpdesk.ticket</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('rug_repair', '=', True)]</field>
+    </record>
+
+    <record id="action_customer_letter_report" model="ir.actions.act_window">
+        <field name="name">Customer Letter Report</field>
+        <field name="res_model">helpdesk.ticket</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>

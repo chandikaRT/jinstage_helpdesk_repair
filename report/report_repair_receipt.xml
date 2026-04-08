@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_repair_receipt">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <h2>Repair Receipt</h2>
+                        <div class="row">
+                            <div class="col-6">
+                                <strong>Reference:</strong> <span t-field="doc.name"/>
+                                <br/>
+                                <strong>Date:</strong> <span t-field="doc.create_date" t-options='{"widget": "date"}'/>
+                            </div>
+                            <div class="col-6">
+                                <strong>Customer:</strong> <span t-field="doc.partner_id"/>
+                                <br/>
+                                <strong>Ticket Type:</strong> <span t-field="doc.ticket_type_id"/>
+                            </div>
+                        </div>
+                        <div class="row mt-3" t-if="doc.repair_serial_no">
+                            <div class="col-12">
+                                <strong>Serial Number:</strong> <span t-field="doc.repair_serial_no"/>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-6">
+                                <strong>Repair Location:</strong> <span t-field="doc.repair_location"/>
+                            </div>
+                        </div>
+                        <div class="row mt-3" t-if="doc.description">
+                            <div class="col-12">
+                                <strong>Issue Description:</strong>
+                                <div t-field="doc.description"/>
+                            </div>
+                        </div>
+                        <div class="row mt-5">
+                            <div class="col-6">
+                                <p>________________________</p>
+                                <p>Customer Signature</p>
+                            </div>
+                            <div class="col-6">
+                                <p>________________________</p>
+                                <p>Received By</p>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

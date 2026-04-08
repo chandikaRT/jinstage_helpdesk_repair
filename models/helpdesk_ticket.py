@@ -1,0 +1,427 @@
+from odoo import _, api, fields, models
+from odoo.exceptions import UserError
+
+
+class HelpdeskTicket(models.Model):
+    _inherit = 'helpdesk.ticket'
+
+    # =========================================================================
+    # REPAIR TYPE CLASSIFICATION
+    # Four repair types distinguished by ticket type flags:
+    #   Under Warranty - RUG:         rug_repair=T, rug_confirmed=T
+    #   Under Warranty - External:    rug_repair=T, rug_confirmed=F
+    #   Not UW With Serial:           normal_repair_with_serial_no=T
+    #   Not UW Without Serial:        normal_repair_without_serial_no=T
+    # =========================================================================
+    rug_repair = fields.Boolean(
+        related='ticket_type_id.is_rug', store=True, string='RUG Repair'
+    )
+    rug_confirmed = fields.Boolean(
+        related='ticket_type_id.is_rug_confirmed', store=True, string='RUG Confirmed'
+    )
+    normal_repair_with_serial_no = fields.Boolean(
+        related='ticket_type_id.is_with_serial_no', store=True,
+        string='Normal Repair (With Serial)'
+    )
+    normal_repair_without_serial_no = fields.Boolean(
+        related='ticket_type_id.is_without_serial_no', store=True,
+        string='Normal Repair (No Serial)'
+    )
+
+    # --- Identification & Tracking ---
+    repair_serial_no = fields.Many2one('stock.lot', string='Serial Number')
+    serial_number = fields.Many2one('stock.lot', string='Serial Number (Alt)')
+    picking_id = fields.Many2one('stock.picking', string='Picking', ondelete='set null')
+    sale_order = fields.Many2one(
+        'sale.order', string='Sale Order',
+        compute='_compute_sale_order', store=True
+    )
+    driver_name = fields.Char(string='Driver Name')
+    vehicle_details = fields.Char(string='Vehicle Details')
+
+    # --- Location Management ---
+    repair_location = fields.Many2one(
+        'stock.location', string='Repair Location',
+        domain="[('usage', 'in', ['internal', 'transit'])]"
+    )
+    return_receipt_location = fields.Many2one('stock.location', string='Return Receipt Location')
+    source_location = fields.Many2one('stock.location', string='Source Location')
+    job_location = fields.Many2one('stock.location', string='Job Location')
+
+    # --- Workflow Status Selections ---
+    quick_repair_status = fields.Selection([
+        ('not_started', 'Not Started'),
+        ('in_progress', 'In Progress'),
+        ('completed', 'Completed'),
+        ('on_hold', 'On Hold'),
+    ], string='Quick Repair Status', tracking=True)
+
+    cancel_status = fields.Selection([
+        ('customer_request', 'Customer Request'),
+        ('beyond_repair', 'Beyond Repair'),
+        ('no_spare_parts', 'No Spare Parts Available'),
+        ('other', 'Other'),
+    ], string='Cancellation Reason', tracking=True)
+
+    reopen_status = fields.Selection([
+        ('customer_request', 'Customer Request'),
+        ('error_correction', 'Error Correction'),
+        ('re_estimate', 'Re-Estimation Required'),
+        ('other', 'Other'),
+    ], string='Reopen Reason', tracking=True)
+
+    re_estimate_status = fields.Selection([
+        ('pending', 'Pending'),
+        ('sent', 'Sent to Customer'),
+        ('approved', 'Customer Approved'),
+        ('rejected', 'Customer Rejected'),
+    ], string='Re-Estimate Status', tracking=True)
+
+    rug_approval_status = fields.Selection([
+        ('pending', 'Pending RUG Approval'),
+        ('approved', 'RUG Approved'),
+        ('rejected', 'RUG Rejected'),
+    ], string='RUG Approval Status', tracking=True)
+
+    material_availability = fields.Selection([
+        ('available', 'Available'),
+        ('partial', 'Partially Available'),
+        ('unavailable', 'Unavailable'),
+        ('ordered', 'Ordered'),
+    ], string='Material Availability', tracking=True)
+
+    # --- Stage Tracking ---
+    stage_date = fields.Datetime(string='Stage Changed Date', tracking=True)
+    cancelled_date = fields.Datetime(string='Cancelled Date')
+    reopened_date = fields.Datetime(string='Reopened Date')
+    cancelled_stage_id = fields.Many2one('helpdesk.stage', string='Stage at Cancellation')
+
+    # --- Boolean Workflow Flags ---
+    send_to_centre = fields.Boolean(string='Send to Centre', default=False)
+    receive_at_centre = fields.Boolean(string='Receive at Centre', default=False)
+    send_to_factory = fields.Boolean(string='Send to Factory', default=False)
+    receive_at_factory = fields.Boolean(string='Receive at Factory', default=False)
+    handed_over = fields.Boolean(string='Handed Over', default=False, readonly=True)
+    fsm_task_done = fields.Boolean(
+        string='FSM Task Done', compute='_compute_fsm_task_done', store=False
+    )
+    cancelled = fields.Boolean(string='Cancelled', default=False, tracking=True)
+    cancelled_2 = fields.Boolean(string='Cancelled (Stage 2)', default=False)
+    repair_serial_created = fields.Boolean(string='Repair Serial Created', default=False)
+    sn_updated = fields.Boolean(string='Serial Number Updated', default=False)
+    rug_approved = fields.Boolean(string='RUG Approved', default=False, tracking=True)
+    rug_request_sent = fields.Boolean(string='RUG Request Sent', default=False, tracking=True)
+    valid_confirmed_so = fields.Boolean(string='SO Confirmed', default=False)
+    valid_confirmed2_so = fields.Boolean(string='SO Confirmed (2)', default=False)
+    valid_delivered_so = fields.Boolean(string='SO Delivered', default=False)
+    valid_invoiced_so = fields.Boolean(string='SO Invoiced', default=False)
+    repair_started_stage_updated = fields.Boolean(string='Repair Started Stage Updated', default=False)
+    estimation_approved_stage_updated = fields.Boolean(string='Estimation Approved Stage Updated', default=False)
+    invoice_stage_updated = fields.Boolean(string='Invoice Stage Updated', default=False)
+    user_location_validation = fields.Boolean(
+        string='User Location Valid', compute='_compute_user_location_validation', store=False
+    )
+
+    # --- Audit & User Tracking ---
+    cancelled_by = fields.Many2one('res.users', string='Cancelled By')
+    reopened_by = fields.Many2one('res.users', string='Reopened By')
+    s_received_by = fields.Many2one('res.users', string='Received By (Centre)')
+    f_received_by = fields.Many2one('res.users', string='Received By (Factory)')
+    s_shipped_by = fields.Many2one('res.users', string='Shipped By (Centre)')
+    f_shipped_by = fields.Many2one('res.users', string='Shipped By (Factory)')
+    created_by_1 = fields.Many2one('res.users', string='Created By 1')
+    created_by_2 = fields.Many2one('res.users', string='Created By 2')
+    created_by_3 = fields.Many2one('res.users', string='Created By 3')
+    created_by_4 = fields.Many2one('res.users', string='Created By 4')
+    created_by_5 = fields.Many2one('res.users', string='Created By 5')
+    created_by_6 = fields.Many2one('res.users', string='Created By 6')
+    created_by_7 = fields.Many2one('res.users', string='Created By 7')
+    created_by_8 = fields.Many2one('res.users', string='Created By 8')
+    created_by_9 = fields.Many2one('res.users', string='Created By 9')
+    created_by_10 = fields.Many2one('res.users', string='Created By 10')
+
+    # --- Financial & Product Fields ---
+    balance_due = fields.Float(string='Balance Due', default=0.0)
+    sales_price = fields.Char(string='Sales Price')
+    unit_price = fields.Float(string='Unit Price', default=0.0)
+    quantity = fields.Integer(string='Quantity', default=1)
+    qty = fields.Char(string='Qty')
+    items = fields.Many2many(
+        'product.product',
+        relation='helpdesk_ticket_product_rel',
+        column1='ticket_id', column2='product_id',
+        string='Items'
+    )
+
+    # --- Document & Image Fields ---
+    warranty_card = fields.Binary(string='Warranty Card', attachment=True)
+    related_information = fields.Binary(string='Related Information', attachment=True)
+
+    # --- Picking Smart Button ---
+    picking_ids = fields.Many2many(
+        'stock.picking', compute='_compute_picking_ids', string='Pickings'
+    )
+    picking_count = fields.Integer(compute='_compute_picking_ids', string='Picking Count')
+
+    # =========================================================================
+    # ORM OVERRIDES
+    # =========================================================================
+
+    def write(self, vals):
+        if 'stage_id' in vals:
+            vals['stage_date'] = fields.Datetime.now()
+        return super().write(vals)
+
+    # =========================================================================
+    # COMPUTED FIELDS
+    # =========================================================================
+
+    @api.depends('task_ids', 'task_ids.stage_id', 'task_ids.stage_id.is_closed')
+    def _compute_fsm_task_done(self):
+        for ticket in self:
+            tasks = ticket.task_ids
+            ticket.fsm_task_done = bool(tasks) and all(
+                t.stage_id.is_closed for t in tasks
+            )
+
+    @api.depends('task_ids', 'task_ids.sale_order_id')
+    def _compute_sale_order(self):
+        for ticket in self:
+            sale_orders = ticket.task_ids.mapped('sale_order_id')
+            ticket.sale_order = sale_orders[:1] if sale_orders else False
+
+    def _compute_user_location_validation(self):
+        for ticket in self:
+            loc = ticket.repair_location
+            if not loc or not loc.users_stock_location:
+                ticket.user_location_validation = True
+            else:
+                ticket.user_location_validation = self.env.user in loc.users_stock_location
+
+    @api.depends('picking_id', 'picking_id.helpdesk_ticket_id')
+    def _compute_picking_ids(self):
+        for ticket in self:
+            pickings = self.env['stock.picking'].search([
+                ('helpdesk_ticket_id', '=', ticket.id)
+            ])
+            ticket.picking_ids = pickings
+            ticket.picking_count = len(pickings)
+
+    # =========================================================================
+    # ONCHANGE
+    # =========================================================================
+
+    @api.onchange('ticket_type_id')
+    def _onchange_ticket_type_id(self):
+        """Clear serial number when changing to a non-serial repair type."""
+        if self.ticket_type_id and not self.ticket_type_id.is_with_serial_no:
+            self.repair_serial_no = False
+
+    @api.onchange('repair_serial_no')
+    def _onchange_repair_serial_no(self):
+        """Mark serial number as updated when changed on existing record."""
+        if self._origin.repair_serial_no and self.repair_serial_no != self._origin.repair_serial_no:
+            self.sn_updated = True
+
+    # =========================================================================
+    # SERIAL NUMBER MANAGEMENT (FR-003)
+    # =========================================================================
+
+    def action_create_serial_number(self):
+        """Create a new stock.lot serial number for this repair ticket."""
+        self.ensure_one()
+        if self.repair_serial_created:
+            raise UserError(_('A serial number has already been created for this ticket.'))
+        if self.normal_repair_without_serial_no:
+            raise UserError(_('Serial number creation is not applicable for repairs without serial tracking.'))
+        lot = self.env['stock.lot'].create({
+            'name': self.name,
+            'company_id': self.company_id.id or self.env.company.id,
+            'product_id': self.items[:1].id if self.items else False,
+        })
+        self.write({
+            'repair_serial_no': lot.id,
+            'repair_serial_created': True,
+            'sn_updated': True,
+        })
+
+    # =========================================================================
+    # CANCEL & REOPEN (FR-008)
+    # =========================================================================
+
+    def action_cancel_ticket(self):
+        """Cancel the repair ticket with full audit trail."""
+        self.ensure_one()
+        if self.cancelled:
+            raise UserError(_('This ticket is already cancelled.'))
+        self.write({
+            'cancelled': True,
+            'cancelled_date': fields.Datetime.now(),
+            'cancelled_by': self.env.uid,
+            'cancelled_stage_id': self.stage_id.id,
+        })
+
+    def action_reopen_ticket(self):
+        """Reopen a cancelled repair ticket."""
+        self.ensure_one()
+        if not self.cancelled:
+            raise UserError(_('Only cancelled tickets can be reopened.'))
+        self.write({
+            'cancelled': False,
+            'reopened_date': fields.Datetime.now(),
+            'reopened_by': self.env.uid,
+        })
+
+    # =========================================================================
+    # RUG APPROVAL WORKFLOW (FR-007)
+    # =========================================================================
+
+    def action_send_rug_request(self):
+        """Send RUG approval request.
+        Only for 'Under Warranty - RUG' (rug_repair=True AND rug_confirmed=True).
+        'External not RUG' (rug_confirmed=False) bypasses approval entirely.
+        """
+        self.ensure_one()
+        if not self.rug_repair or not self.rug_confirmed:
+            raise UserError(_(
+                'RUG approval request is only for "Under Warranty - RUG" repair types.'
+            ))
+        if self.rug_request_sent:
+            raise UserError(_('RUG approval request has already been sent.'))
+        self.write({
+            'rug_request_sent': True,
+            'rug_approval_status': 'pending',
+        })
+
+    def action_approve_rug(self):
+        """Approve RUG request. Note: rug_confirmed is a related field from ticket type,
+        NOT set here — it is determined by which ticket type record is selected.
+        """
+        self.ensure_one()
+        if self.rug_approval_status != 'pending':
+            raise UserError(_('RUG approval is only possible when status is Pending.'))
+        self.write({
+            'rug_approval_status': 'approved',
+            'rug_approved': True,
+        })
+
+    def action_reject_rug(self):
+        """Reject RUG request."""
+        self.ensure_one()
+        if self.rug_approval_status != 'pending':
+            raise UserError(_('RUG rejection is only possible when status is Pending.'))
+        self.write({
+            'rug_approval_status': 'rejected',
+            'rug_approved': False,
+        })
+
+    # =========================================================================
+    # REPAIR ROUTE & STOCK PICKING (FR-005)
+    # =========================================================================
+
+    def action_create_repair_route(self):
+        """Create stock picking records for the repair route."""
+        self.ensure_one()
+        if self.picking_count > 0:
+            raise UserError(_('Repair route has already been created for this ticket.'))
+        if not self.repair_location:
+            raise UserError(_('Please assign a Repair Location before creating the repair route.'))
+        picking_type = self.env['stock.picking.type'].search([
+            ('code', '=', 'incoming'),
+            ('warehouse_id.lot_stock_id', '=', self.repair_location.id),
+        ], limit=1)
+        if not picking_type:
+            picking_type = self.env['stock.picking.type'].search([
+                ('code', '=', 'incoming'),
+            ], limit=1)
+        picking = self.env['stock.picking'].create({
+            'picking_type_id': picking_type.id,
+            'location_id': self.source_location.id or self.env.ref('stock.stock_location_customers').id,
+            'location_dest_id': self.repair_location.id,
+            'origin': self.name,
+            'helpdesk_ticket_id': self.id,
+        })
+        self.write({'picking_id': picking.id})
+
+    def action_view_pickings(self):
+        """Open filtered list of stock pickings for this ticket."""
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Repair Pickings'),
+            'res_model': 'stock.picking',
+            'view_mode': 'list,form',
+            'domain': [('helpdesk_ticket_id', '=', self.id)],
+            'context': {'default_helpdesk_ticket_id': self.id},
+        }
+
+    def action_view_fsm_tasks(self):
+        """Open FSM tasks linked to this ticket."""
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('FSM Tasks'),
+            'res_model': 'project.task',
+            'view_mode': 'list,form',
+            'domain': [('helpdesk_ticket_ids', 'in', [self.id])],
+        }
+
+    # =========================================================================
+    # CENTRE / FACTORY TRANSFER TRACKING (FR-006)
+    # =========================================================================
+
+    def action_send_to_centre(self):
+        """Mark item as dispatched to sales centre."""
+        self.ensure_one()
+        if not self.picking_count:
+            raise UserError(_('Please create the repair route before sending to centre.'))
+        self.write({
+            'send_to_centre': True,
+            's_shipped_by': self.env.uid,
+            'stage_date': fields.Datetime.now(),
+        })
+
+    def action_receive_at_centre(self):
+        """Mark item as received at sales centre."""
+        self.ensure_one()
+        if not self.send_to_centre:
+            raise UserError(_('Item has not been sent to centre yet.'))
+        if self.receive_at_centre:
+            raise UserError(_('Item has already been received at centre.'))
+        self.write({
+            'receive_at_centre': True,
+            's_received_by': self.env.uid,
+            'stage_date': fields.Datetime.now(),
+        })
+
+    def action_send_to_factory(self):
+        """Mark item as dispatched to factory.
+        Approval is required ONLY for Under Warranty - RUG (rug_confirmed=True).
+        External not RUG (rug_confirmed=False) does NOT require approval.
+        """
+        self.ensure_one()
+        if not self.receive_at_centre:
+            raise UserError(_('Item must be received at centre before sending to factory.'))
+        if self.rug_repair and self.rug_confirmed and not self.rug_approved:
+            raise UserError(_(
+                'RUG approval is required before sending to factory for '
+                '"Under Warranty - RUG" repairs.'
+            ))
+        self.write({
+            'send_to_factory': True,
+            'f_shipped_by': self.env.uid,
+            'stage_date': fields.Datetime.now(),
+        })
+
+    def action_receive_at_factory(self):
+        """Mark item as received at factory."""
+        self.ensure_one()
+        if not self.send_to_factory:
+            raise UserError(_('Item has not been sent to factory yet.'))
+        if self.receive_at_factory:
+            raise UserError(_('Item has already been received at factory.'))
+        self.write({
+            'receive_at_factory': True,
+            'f_received_by': self.env.uid,
+            'stage_date': fields.Datetime.now(),
+        })

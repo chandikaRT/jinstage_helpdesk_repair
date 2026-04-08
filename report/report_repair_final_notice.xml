@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_repair_final_notice">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <h2>Repair Completion Notice</h2>
+                        <div class="row">
+                            <div class="col-6">
+                                <strong>Reference:</strong> <span t-field="doc.name"/><br/>
+                                <strong>Customer:</strong> <span t-field="doc.partner_id"/>
+                            </div>
+                            <div class="col-6">
+                                <strong>Completion Date:</strong> <span t-field="doc.stage_date"/><br/>
+                                <t t-if="doc.repair_serial_no">
+                                    <strong>Serial Number:</strong> <span t-field="doc.repair_serial_no"/>
+                                </t>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-12">
+                                <p>We are pleased to inform you that the repair of your item has been completed.</p>
+                                <t t-if="doc.description"><div t-field="doc.description"/></t>
+                            </div>
+                        </div>
+                        <div class="row mt-3" t-if="doc.items">
+                            <div class="col-12">
+                                <strong>Items Repaired:</strong>
+                                <ul>
+                                    <li t-foreach="doc.items" t-as="item">
+                                        <span t-field="item.name"/>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-6">
+                                <strong>Amount Due:</strong>
+                                <span t-field="doc.balance_due"/>
+                            </div>
+                        </div>
+                        <div class="row mt-5">
+                            <div class="col-6">
+                                <p>________________________</p>
+                                <p>Customer Signature</p>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

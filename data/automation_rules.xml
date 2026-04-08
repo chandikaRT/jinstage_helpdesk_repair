@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- ============================================================
+             Rule 1: Company ID in Helpdesk Stage (Active)
+             ============================================================ -->
+        <record id="action_server_set_company_stage" model="ir.actions.server">
+            <field name="name">Set Company ID on Stage</field>
+            <field name="model_id" ref="helpdesk.model_helpdesk_stage"/>
+            <field name="state">code</field>
+            <field name="code">
+company_id = env.context.get('allowed_company_ids', [env.user.company_id.id])[0]
+company = env['res.company'].browse(company_id)
+record['company_id'] = company.id
+            </field>
+        </record>
+
+        <record id="automation_company_in_stage" model="base.automation">
+            <field name="name">JIN - Company Id in Helpdesk Stage</field>
+            <field name="model_id" ref="helpdesk.model_helpdesk_stage"/>
+            <field name="trigger">on_write</field>
+            <field name="active">True</field>
+            <field name="action_server_ids" eval="[(4, ref('jinstage_helpdesk_repair.action_server_set_company_stage'))]"/>
+        </record>
+
+        <!-- ============================================================
+             Rule 2: Repair Sequence (Active)
+             ============================================================ -->
+        <record id="action_server_assign_repair_sequence" model="ir.actions.server">
+            <field name="name">Assign Repair Sequence</field>
+            <field name="model_id" ref="helpdesk.model_helpdesk_ticket"/>
+            <field name="state">code</field>
+            <field name="code">
+if record.name == 'New':
+    seq = env['ir.sequence'].next_by_code('repair.seq')
+    record.write({'name': seq})
+            </field>
+        </record>
+
+        <record id="automation_repair_sequence" model="base.automation">
+            <field name="name">JIN - Helpdesk Repair Seq.No</field>
+            <field name="model_id" ref="helpdesk.model_helpdesk_ticket"/>
+            <field name="trigger">on_create</field>
+            <field name="filter_domain">[('name', '=', 'New')]</field>
+            <field name="active">True</field>
+            <field name="action_server_ids" eval="[(4, ref('jinstage_helpdesk_repair.action_server_assign_repair_sequence'))]"/>
+        </record>
+
+        <!-- ============================================================
+             Rule 3: Location Validation (Inactive)
+             ============================================================ -->
+        <record id="action_server_validate_user_location" model="ir.actions.server">
+            <field name="name">Validate User Location</field>
+            <field name="model_id" ref="helpdesk.model_helpdesk_ticket"/>
+            <field name="state">code</field>
+            <field name="code">
+if record.user_location_validation == False:
+    permitted = env['stock.location'].search([('users_stock_location', 'in', [env.uid])])
+    if permitted:
+        raise UserError('You do not have access to the assigned repair location: %s. Your permitted locations are: %s' % (record.repair_location.name, ', '.join(permitted.mapped('complete_name'))))
+    else:
+        raise UserError('No warehouses have been configured for your user. Please contact your administrator.')
+            </field>
+        </record>
+
+        <record id="automation_location_validation" model="base.automation">
+            <field name="name">User Location Validation - Helpdesk</field>
+            <field name="model_id" ref="helpdesk.model_helpdesk_ticket"/>
+            <field name="trigger">on_write</field>
+            <field name="active">False</field>
+            <field name="action_server_ids" eval="[(4, ref('jinstage_helpdesk_repair.action_server_validate_user_location'))]"/>
+        </record>
+
+    </data>
+</odoo>

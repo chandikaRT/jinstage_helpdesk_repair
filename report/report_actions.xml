@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Repair Receipt: US Letter -->
+        <record id="action_report_repair_receipt" model="ir.actions.report">
+            <field name="name">Repair Receipt</field>
+            <field name="model">helpdesk.ticket</field>
+            <field name="report_type">qweb-pdf</field>
+            <field name="report_name">jinstage_helpdesk_repair.report_repair_receipt</field>
+            <field name="report_file">jinstage_helpdesk_repair.report_repair_receipt</field>
+            <field name="binding_model_id" ref="helpdesk.model_helpdesk_ticket"/>
+            <field name="binding_type">report</field>
+            <field name="paperformat_id" ref="base.paperformat_us"/>
+        </record>
+
+        <!-- Repair Status: Default -->
+        <record id="action_report_repair_status" model="ir.actions.report">
+            <field name="name">Repair Status</field>
+            <field name="model">helpdesk.ticket</field>
+            <field name="report_type">qweb-pdf</field>
+            <field name="report_name">jinstage_helpdesk_repair.report_repair_status</field>
+            <field name="report_file">jinstage_helpdesk_repair.report_repair_status</field>
+            <field name="binding_model_id" ref="helpdesk.model_helpdesk_ticket"/>
+            <field name="binding_type">report</field>
+        </record>
+
+        <!-- Repair Final Notice: EUR A4 -->
+        <record id="action_report_repair_final_notice" model="ir.actions.report">
+            <field name="name">Repair Final Notice</field>
+            <field name="model">helpdesk.ticket</field>
+            <field name="report_type">qweb-pdf</field>
+            <field name="report_name">jinstage_helpdesk_repair.report_repair_final_notice</field>
+            <field name="report_file">jinstage_helpdesk_repair.report_repair_final_notice</field>
+            <field name="binding_model_id" ref="helpdesk.model_helpdesk_ticket"/>
+            <field name="binding_type">report</field>
+            <field name="paperformat_id" ref="jinstage_helpdesk_repair.paperformat_eur_a4"/>
+        </record>
+
+        <!-- Repair Final Notice Scrappage: US Letter -->
+        <record id="action_report_repair_final_notice_scrappage" model="ir.actions.report">
+            <field name="name">Repair Final Notice - Scrappage</field>
+            <field name="model">helpdesk.ticket</field>
+            <field name="report_type">qweb-pdf</field>
+            <field name="report_name">jinstage_helpdesk_repair.report_repair_final_notice_scrappage</field>
+            <field name="report_file">jinstage_helpdesk_repair.report_repair_final_notice_scrappage</field>
+            <field name="binding_model_id" ref="helpdesk.model_helpdesk_ticket"/>
+            <field name="binding_type">report</field>
+            <field name="paperformat_id" ref="base.paperformat_us"/>
+        </record>
+
+        <!-- Helpdesk Ticket Report: Default -->
+        <record id="action_report_helpdesk_ticket" model="ir.actions.report">
+            <field name="name">Helpdesk Ticket Report</field>
+            <field name="model">helpdesk.ticket</field>
+            <field name="report_type">qweb-pdf</field>
+            <field name="report_name">jinstage_helpdesk_repair.report_helpdesk_ticket</field>
+            <field name="report_file">jinstage_helpdesk_repair.report_helpdesk_ticket</field>
+            <field name="binding_model_id" ref="helpdesk.model_helpdesk_ticket"/>
+            <field name="binding_type">report</field>
+        </record>
+    </data>
+</odoo>

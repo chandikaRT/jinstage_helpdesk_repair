@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="repair_type_uw_rug" model="helpdesk.ticket.type">
+            <field name="name">Repair - Under Warranty - RUG</field>
+            <field name="is_rug">True</field>
+            <field name="is_rug_confirmed">True</field>
+        </record>
+        <record id="repair_type_uw_external" model="helpdesk.ticket.type">
+            <field name="name">Repair - Under Warranty - External not RUG</field>
+            <field name="is_rug">True</field>
+            <field name="is_rug_confirmed">False</field>
+        </record>
+        <record id="repair_type_nuw_serial" model="helpdesk.ticket.type">
+            <field name="name">Repair - Not Under Warranty (With Serial No)</field>
+            <field name="is_with_serial_no">True</field>
+        </record>
+        <record id="repair_type_nuw_no_serial" model="helpdesk.ticket.type">
+            <field name="name">Repair - Not Under Warranty (Without Serial No)</field>
+            <field name="is_without_serial_no">True</field>
+        </record>
+    </data>
+</odoo>

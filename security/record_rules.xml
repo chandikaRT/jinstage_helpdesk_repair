@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="rule_helpdesk_stage_company" model="ir.rule">
+            <field name="name">Helpdesk Stage: Multi-Company Filter</field>
+            <field name="model_id" ref="helpdesk.model_helpdesk_stage"/>
+            <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+        </record>
+    </data>
+</odoo>

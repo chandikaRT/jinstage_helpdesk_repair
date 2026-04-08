@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Stage Form: add company_id field -->
+    <record id="view_helpdesk_stage_repair_form" model="ir.ui.view">
+        <field name="name">helpdesk.stage.repair.form</field>
+        <field name="model">helpdesk.stage</field>
+        <field name="inherit_id" ref="helpdesk.helpdesk_stage_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='name']" position="after">
+                <field name="company_id"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Stage List: add company_id column -->
+    <record id="view_helpdesk_stage_repair_list" model="ir.ui.view">
+        <field name="name">helpdesk.stage.repair.list</field>
+        <field name="model">helpdesk.stage</field>
+        <field name="inherit_id" ref="helpdesk.helpdesk_stage_view_list"/>
+        <field name="arch" type="xml">
+            <xpath expr="//list" position="inside">
+                <field name="company_id" optional="show"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

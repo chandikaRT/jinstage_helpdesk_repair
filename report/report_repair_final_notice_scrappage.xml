@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_repair_final_notice_scrappage">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <h2>Repair Assessment Notice — Scrappage</h2>
+                        <div class="row">
+                            <div class="col-6">
+                                <strong>Reference:</strong> <span t-field="doc.name"/><br/>
+                                <strong>Customer:</strong> <span t-field="doc.partner_id"/>
+                            </div>
+                            <div class="col-6">
+                                <strong>Assessment Date:</strong> <span t-field="doc.stage_date"/>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-12">
+                                <div class="alert alert-warning">
+                                    <strong>Notice:</strong> Following assessment, this item has been
+                                    determined to be beyond economical repair and has been classified
+                                    for scrappage/write-off.
+                                </div>
+                                <t t-if="doc.description"><div t-field="doc.description"/></t>
+                            </div>
+                        </div>
+                        <div class="row mt-5">
+                            <div class="col-6">
+                                <p>________________________</p>
+                                <p>Customer Signature</p>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_helpdesk_ticket">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <h2>Helpdesk Ticket</h2>
+                        <h4 t-field="doc.name"/>
+
+                        <!-- Basic Info -->
+                        <div class="row">
+                            <div class="col-6">
+                                <strong>Customer:</strong> <span t-field="doc.partner_id"/><br/>
+                                <strong>Ticket Type:</strong> <span t-field="doc.ticket_type_id"/><br/>
+                                <strong>Stage:</strong> <span t-field="doc.stage_id"/><br/>
+                                <strong>Stage Date:</strong> <span t-field="doc.stage_date"/><br/>
+                                <strong>Assigned To:</strong> <span t-field="doc.user_id"/>
+                            </div>
+                            <div class="col-6">
+                                <strong>Created:</strong>
+                                <span t-field="doc.create_date" t-options='{"widget": "date"}'/><br/>
+                                <t t-if="doc.repair_serial_no">
+                                    <strong>Serial Number:</strong>
+                                    <span t-field="doc.repair_serial_no"/><br/>
+                                </t>
+                                <strong>Repair Location:</strong>
+                                <span t-field="doc.repair_location"/>
+                            </div>
+                        </div>
+
+                        <!-- Repair Classification -->
+                        <h5 class="mt-3">Repair Classification</h5>
+                        <div class="row">
+                            <div class="col-6">
+                                <strong>RUG Repair:</strong>
+                                <span t-if="doc.rug_repair">Yes</span><span t-else="">No</span><br/>
+                                <strong>RUG Confirmed:</strong>
+                                <span t-if="doc.rug_confirmed">Yes</span><span t-else="">No</span><br/>
+                                <strong>With Serial No:</strong>
+                                <span t-if="doc.normal_repair_with_serial_no">Yes</span>
+                                <span t-else="">No</span><br/>
+                                <strong>Without Serial No:</strong>
+                                <span t-if="doc.normal_repair_without_serial_no">Yes</span>
+                                <span t-else="">No</span>
+                            </div>
+                            <div class="col-6">
+                                <strong>RUG Approval Status:</strong>
+                                <span t-field="doc.rug_approval_status"/><br/>
+                                <strong>Material Availability:</strong>
+                                <span t-field="doc.material_availability"/><br/>
+                                <strong>Quick Repair Status:</strong>
+                                <span t-field="doc.quick_repair_status"/>
+                            </div>
+                        </div>
+
+                        <!-- Logistics -->
+                        <h5 class="mt-3">Logistics</h5>
+                        <div class="row">
+                            <div class="col-6">
+                                <strong>Driver Name:</strong> <span t-field="doc.driver_name"/><br/>
+                                <strong>Vehicle Details:</strong> <span t-field="doc.vehicle_details"/>
+                            </div>
+                            <div class="col-6">
+                                <strong>Source Location:</strong>
+                                <span t-field="doc.source_location"/><br/>
+                                <strong>Job Location:</strong>
+                                <span t-field="doc.job_location"/>
+                            </div>
+                        </div>
+
+                        <!-- Movement Flags -->
+                        <h5 class="mt-3">Movement Status</h5>
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Movement</th>
+                                    <th>Status</th>
+                                    <th>By</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Send to Centre</td>
+                                    <td>
+                                        <span t-if="doc.send_to_centre">Done</span>
+                                        <span t-else="">Pending</span>
+                                    </td>
+                                    <td t-field="doc.s_shipped_by"/>
+                                </tr>
+                                <tr>
+                                    <td>Receive at Centre</td>
+                                    <td>
+                                        <span t-if="doc.receive_at_centre">Done</span>
+                                        <span t-else="">Pending</span>
+                                    </td>
+                                    <td t-field="doc.s_received_by"/>
+                                </tr>
+                                <tr>
+                                    <td>Send to Factory</td>
+                                    <td>
+                                        <span t-if="doc.send_to_factory">Done</span>
+                                        <span t-else="">Pending</span>
+                                    </td>
+                                    <td t-field="doc.f_shipped_by"/>
+                                </tr>
+                                <tr>
+                                    <td>Receive at Factory</td>
+                                    <td>
+                                        <span t-if="doc.receive_at_factory">Done</span>
+                                        <span t-else="">Pending</span>
+                                    </td>
+                                    <td t-field="doc.f_received_by"/>
+                                </tr>
+                                <tr>
+                                    <td>Handed Over</td>
+                                    <td>
+                                        <span t-if="doc.handed_over">Done</span>
+                                        <span t-else="">Pending</span>
+                                    </td>
+                                    <td></td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <!-- Financial -->
+                        <h5 class="mt-3">Financial</h5>
+                        <div class="row">
+                            <div class="col-6">
+                                <strong>Sales Price:</strong> <span t-field="doc.sales_price"/><br/>
+                                <strong>Unit Price:</strong> <span t-field="doc.unit_price"/><br/>
+                                <strong>Quantity:</strong> <span t-field="doc.quantity"/>
+                            </div>
+                            <div class="col-6">
+                                <strong>Balance Due:</strong> <span t-field="doc.balance_due"/><br/>
+                                <strong>Sale Order:</strong> <span t-field="doc.sale_order"/>
+                            </div>
+                        </div>
+
+                        <!-- Items -->
+                        <div class="row mt-3" t-if="doc.items">
+                            <div class="col-12">
+                                <h5>Items</h5>
+                                <ul>
+                                    <li t-foreach="doc.items" t-as="item">
+                                        <span t-field="item.name"/>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- Description -->
+                        <div class="row mt-3" t-if="doc.description">
+                            <div class="col-12">
+                                <h5>Issue Description</h5>
+                                <div t-field="doc.description"/>
+                            </div>
+                        </div>
+
+                        <!-- Cancel / Reopen Log -->
+                        <h5 class="mt-3">Cancel / Reopen Log</h5>
+                        <div class="row">
+                            <div class="col-6">
+                                <strong>Cancelled:</strong>
+                                <span t-if="doc.cancelled">Yes</span>
+                                <span t-else="">No</span><br/>
+                                <t t-if="doc.cancelled">
+                                    <strong>Cancel Status:</strong>
+                                    <span t-field="doc.cancel_status"/><br/>
+                                    <strong>Cancelled Date:</strong>
+                                    <span t-field="doc.cancelled_date"/><br/>
+                                    <strong>Cancelled By:</strong>
+                                    <span t-field="doc.cancelled_by"/><br/>
+                                    <strong>Stage at Cancel:</strong>
+                                    <span t-field="doc.cancelled_stage_id"/>
+                                </t>
+                            </div>
+                            <div class="col-6">
+                                <t t-if="doc.reopened_date">
+                                    <strong>Reopen Status:</strong>
+                                    <span t-field="doc.reopen_status"/><br/>
+                                    <strong>Reopened Date:</strong>
+                                    <span t-field="doc.reopened_date"/><br/>
+                                    <strong>Reopened By:</strong>
+                                    <span t-field="doc.reopened_by"/>
+                                </t>
+                            </div>
+                        </div>
+
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>
