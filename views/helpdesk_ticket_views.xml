@@ -23,37 +23,51 @@
                 <field name="cancelled" invisible="1"/>
                 <field name="repair_serial_created" invisible="1"/>
                 <field name="normal_repair_without_serial_no" invisible="1"/>
+                <field name="fsm_task_done" invisible="1"/>
             </xpath>
 
-            <!-- Action Buttons in header -->
+            <!-- Action Buttons in header
+                 Workflow order (per end-user documentation):
+                 1. Create Return Transfer
+                 2. Send to Factory → Receive at Factory
+                 3. Plan Intervention (requires factory receipt + repair reason)
+                 4. Send RUG Request → Approve/Reject RUG  (RUG type only, after quotation)
+                 5. Send to Sales Centre → Receive at Sales Centre  (after repair done)
+                 6. Cancel / Reopen
+                 7. Receipt (print)
+            -->
             <xpath expr="//header" position="inside">
+                <!-- Step 1: Create return transfer to receive item into repair location -->
                 <button name="action_create_repair_route"
-                        string="Create Repair Route"
+                        string="Create Return Transfer"
                         type="object"
                         class="btn-primary"
                         invisible="picking_count > 0"/>
-                <button name="action_send_to_centre"
-                        string="Send to Centre"
-                        type="object"
-                        class="btn-secondary"
-                        invisible="send_to_centre or picking_count == 0"/>
-                <button name="action_receive_at_centre"
-                        string="Receive at Centre"
-                        type="object"
-                        class="btn-secondary"
-                        invisible="receive_at_centre or not send_to_centre"/>
+
+                <!-- Step 2a: Send to Factory (first movement — no centre prerequisite) -->
                 <button name="action_send_to_factory"
                         string="Send to Factory"
                         type="object"
                         class="btn-secondary"
-                        invisible="send_to_factory or not receive_at_centre"/>
+                        invisible="send_to_factory or picking_count == 0"/>
+
+                <!-- Step 2b: Receive at Factory -->
                 <button name="action_receive_at_factory"
                         string="Receive at Factory"
                         type="object"
                         class="btn-secondary"
                         invisible="receive_at_factory or not send_to_factory"/>
+
+                <!-- Step 3: Plan Intervention (requires factory receipt + repair reason) -->
+                <button name="action_plan_intervention"
+                        string="Plan Intervention"
+                        type="object"
+                        class="btn-primary"
+                        invisible="not receive_at_factory or fsm_task_done"/>
+
+                <!-- Step 4a: RUG Approval — only for Under Warranty - RUG, after quotation -->
                 <button name="action_send_rug_request"
-                        string="Send RUG Request"
+                        string="Request RUG Approval"
                         type="object"
                         class="btn-secondary"
                         invisible="not rug_confirmed or rug_request_sent"/>
@@ -69,6 +83,22 @@
                         class="btn-danger"
                         groups="helpdesk.group_helpdesk_manager"
                         invisible="not rug_confirmed or not rug_request_sent or rug_approved"/>
+
+                <!-- Step 5a: Send back to Sales Centre (after factory repair completed) -->
+                <button name="action_send_to_centre"
+                        string="Send to Sales Centre"
+                        type="object"
+                        class="btn-secondary"
+                        invisible="send_to_centre or not receive_at_factory"/>
+
+                <!-- Step 5b: Receive at Sales Centre -->
+                <button name="action_receive_at_centre"
+                        string="Receive at Sales Centre"
+                        type="object"
+                        class="btn-secondary"
+                        invisible="receive_at_centre or not send_to_centre"/>
+
+                <!-- Cancel / Reopen -->
                 <button name="action_cancel_ticket"
                         string="Cancel"
                         type="object"
@@ -79,6 +109,8 @@
                         type="object"
                         class="btn-secondary"
                         invisible="not cancelled"/>
+
+                <!-- Receipt / print -->
                 <button name="action_view_pickings"
                         string="Receipt"
                         type="object"
@@ -86,14 +118,14 @@
                         invisible="not picking_count"/>
             </xpath>
 
-            <!-- Smart Button: Pickings -->
+            <!-- Smart Button: Repair Transfers -->
             <xpath expr="//div[@name='button_box']" position="inside">
                 <button name="action_view_pickings"
                         type="object"
                         class="oe_stat_button"
                         icon="fa-truck"
                         invisible="not picking_count">
-                    <field name="picking_count" widget="statinfo" string="Pickings"/>
+                    <field name="picking_count" widget="statinfo" string="Repair Trans"/>
                 </button>
             </xpath>
 
@@ -106,11 +138,14 @@
                         <field name="normal_repair_with_serial_no" readonly="1"/>
                         <field name="normal_repair_without_serial_no" readonly="1"/>
                     </group>
-                    <group string="Serial Number"
-                           invisible="normal_repair_without_serial_no">
+                    <group string="Serial Number">
                         <field name="repair_serial_no"/>
                         <field name="repair_serial_created" readonly="1"/>
                         <field name="sn_updated" readonly="1"/>
+                    </group>
+                    <group string="Repair Details">
+                        <field name="repair_reason_id"
+                               attrs="{'required': [('receive_at_factory', '=', True)]}"/>
                     </group>
                     <group string="Logistics">
                         <field name="driver_name"/>
@@ -151,12 +186,12 @@
                     <field name="stage_date" readonly="1"/>
                     <field name="user_location_validation" readonly="1"/>
                 </group>
-                <separator string="Movement Flags"/>
+                <separator string="Movement Flags (Factory First, Then Centre)"/>
                 <group>
-                    <field name="send_to_centre" readonly="1"/>
-                    <field name="receive_at_centre" readonly="1"/>
                     <field name="send_to_factory" readonly="1"/>
                     <field name="receive_at_factory" readonly="1"/>
+                    <field name="send_to_centre" readonly="1"/>
+                    <field name="receive_at_centre" readonly="1"/>
                     <field name="handed_over" readonly="1"/>
                     <field name="fsm_task_done" readonly="1"/>
                 </group>
@@ -170,10 +205,10 @@
                 </group>
                 <separator string="User Tracking"/>
                 <group>
-                    <field name="s_shipped_by" readonly="1"/>
-                    <field name="s_received_by" readonly="1"/>
                     <field name="f_shipped_by" readonly="1"/>
                     <field name="f_received_by" readonly="1"/>
+                    <field name="s_shipped_by" readonly="1"/>
+                    <field name="s_received_by" readonly="1"/>
                 </group>
             </xpath>
 
@@ -234,7 +269,7 @@
     </record>
 
     <!-- ============================================================
-         3. LIST VIEW EXTENSION
+         3. LIST/TREE VIEW EXTENSION
          ============================================================ -->
     <record id="view_helpdesk_ticket_repair_list" model="ir.ui.view">
         <field name="name">helpdesk.ticket.repair.list</field>
@@ -247,6 +282,7 @@
                 <field name="normal_repair_with_serial_no" optional="show"/>
                 <field name="repair_serial_no" optional="show"/>
                 <field name="repair_location" optional="show"/>
+                <field name="repair_reason_id" optional="show"/>
                 <field name="rug_approval_status" optional="show"/>
                 <field name="material_availability" optional="show"/>
                 <field name="balance_due" optional="show"/>

@@ -31,6 +31,9 @@ class HelpdeskTicket(models.Model):
     # --- Identification & Tracking ---
     repair_serial_no = fields.Many2one('stock.lot', string='Serial Number')
     serial_number = fields.Many2one('stock.lot', string='Serial Number (Alt)')
+    repair_reason_id = fields.Many2one(
+        'jinstage.repair.reason', string='Repair Reason', tracking=True
+    )
     picking_id = fields.Many2one('stock.picking', string='Picking', ondelete='set null')
     sale_order = fields.Many2one(
         'sale.order', string='Sale Order',
@@ -236,12 +239,13 @@ class HelpdeskTicket(models.Model):
     # =========================================================================
 
     def action_create_serial_number(self):
-        """Create a new stock.lot serial number for this repair ticket."""
+        """Create a new stock.lot serial number for this repair ticket.
+        All repair types may create an internal tracking serial — even "Without Serial No"
+        types where the customer did not provide one. The system assigns one for traceability.
+        """
         self.ensure_one()
         if self.repair_serial_created:
             raise UserError(_('A serial number has already been created for this ticket.'))
-        if self.normal_repair_without_serial_no:
-            raise UserError(_('Serial number creation is not applicable for repairs without serial tracking.'))
         lot = self.env['stock.lot'].create({
             'name': self.name,
             'company_id': self.company_id.id or self.env.company.id,
@@ -288,11 +292,18 @@ class HelpdeskTicket(models.Model):
         """Send RUG approval request.
         Only for 'Under Warranty - RUG' (rug_repair=True AND rug_confirmed=True).
         'External not RUG' (rug_confirmed=False) bypasses approval entirely.
+        Per workflow: approval is requested AFTER the quotation is created (products added
+        at factory), BEFORE the customer confirms the sale order.
         """
         self.ensure_one()
         if not self.rug_repair or not self.rug_confirmed:
             raise UserError(_(
                 'RUG approval request is only for "Under Warranty - RUG" repair types.'
+            ))
+        if not self.sale_order:
+            raise UserError(_(
+                'A quotation must be created (add repair items via Plan Intervention) '
+                'before requesting RUG approval.'
             ))
         if self.rug_request_sent:
             raise UserError(_('RUG approval request has already been sent.'))
@@ -378,43 +389,14 @@ class HelpdeskTicket(models.Model):
     # CENTRE / FACTORY TRANSFER TRACKING (FR-006)
     # =========================================================================
 
-    def action_send_to_centre(self):
-        """Mark item as dispatched to sales centre."""
-        self.ensure_one()
-        if not self.picking_count:
-            raise UserError(_('Please create the repair route before sending to centre.'))
-        self.write({
-            'send_to_centre': True,
-            's_shipped_by': self.env.uid,
-            'stage_date': fields.Datetime.now(),
-        })
-
-    def action_receive_at_centre(self):
-        """Mark item as received at sales centre."""
-        self.ensure_one()
-        if not self.send_to_centre:
-            raise UserError(_('Item has not been sent to centre yet.'))
-        if self.receive_at_centre:
-            raise UserError(_('Item has already been received at centre.'))
-        self.write({
-            'receive_at_centre': True,
-            's_received_by': self.env.uid,
-            'stage_date': fields.Datetime.now(),
-        })
-
     def action_send_to_factory(self):
         """Mark item as dispatched to factory.
-        Approval is required ONLY for Under Warranty - RUG (rug_confirmed=True).
-        External not RUG (rug_confirmed=False) does NOT require approval.
+        This is the first movement step after creating the repair route.
+        No approval gate here — RUG approval happens after the quotation is created.
         """
         self.ensure_one()
-        if not self.receive_at_centre:
-            raise UserError(_('Item must be received at centre before sending to factory.'))
-        if self.rug_repair and self.rug_confirmed and not self.rug_approved:
-            raise UserError(_(
-                'RUG approval is required before sending to factory for '
-                '"Under Warranty - RUG" repairs.'
-            ))
+        if not self.picking_count:
+            raise UserError(_('Please create the return transfer before sending to factory.'))
         self.write({
             'send_to_factory': True,
             'f_shipped_by': self.env.uid,
@@ -433,3 +415,59 @@ class HelpdeskTicket(models.Model):
             'f_received_by': self.env.uid,
             'stage_date': fields.Datetime.now(),
         })
+
+    def action_send_to_centre(self):
+        """Mark repaired item as dispatched back to the sales centre.
+        This happens AFTER factory repair work is completed.
+        """
+        self.ensure_one()
+        if not self.receive_at_factory:
+            raise UserError(_(
+                'Item must be received at factory and repair completed before '
+                'sending back to the sales centre.'
+            ))
+        self.write({
+            'send_to_centre': True,
+            's_shipped_by': self.env.uid,
+            'stage_date': fields.Datetime.now(),
+        })
+
+    def action_receive_at_centre(self):
+        """Mark repaired item as received at sales centre (final leg before handover)."""
+        self.ensure_one()
+        if not self.send_to_centre:
+            raise UserError(_('Item has not been sent to centre yet.'))
+        if self.receive_at_centre:
+            raise UserError(_('Item has already been received at centre.'))
+        self.write({
+            'receive_at_centre': True,
+            's_received_by': self.env.uid,
+            'stage_date': fields.Datetime.now(),
+        })
+
+    def action_plan_intervention(self):
+        """Activate FSM task for repair work at factory.
+        Repair reason is mandatory before proceeding.
+        Guards: item must be received at factory; repair reason must be set.
+        """
+        self.ensure_one()
+        if not self.receive_at_factory:
+            raise UserError(_('Item must be received at factory before planning intervention.'))
+        if not self.repair_reason_id:
+            raise UserError(_(
+                'Repair Reason is required before planning the intervention. '
+                'Please set the Repair Reason field.'
+            ))
+        self.write({'repair_started_stage_updated': True})
+        has_task_ids = 'task_ids' in self.env['helpdesk.ticket']._fields
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Repair Tasks'),
+            'res_model': 'project.task',
+            'view_mode': 'tree,form',
+            'domain': [('helpdesk_ticket_ids', 'in', [self.id])] if has_task_ids else [],
+            'context': {
+                'default_helpdesk_ticket_ids': [(4, self.id)] if has_task_ids else [],
+                'default_is_fsm': True,
+            },
+        }
