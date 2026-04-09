@@ -34,6 +34,10 @@ class HelpdeskTicket(models.Model):
     repair_reason_id = fields.Many2one(
         'jinstage.repair.reason', string='Repair Reason', tracking=True
     )
+    customer_type = fields.Selection([
+        ('cash', 'Cash Customer'),
+        ('credit', 'Credit Customer'),
+    ], string='Customer Type', tracking=True)
     picking_id = fields.Many2one('stock.picking', string='Picking', ondelete='set null')
     sale_order = fields.Many2one(
         'sale.order', string='Sale Order',
@@ -124,6 +128,21 @@ class HelpdeskTicket(models.Model):
     user_location_validation = fields.Boolean(
         string='User Location Valid', compute='_compute_user_location_validation', store=False
     )
+    tested_ok = fields.Boolean(string='Tested OK', default=False, tracking=True)
+    image_uploaded = fields.Boolean(string='Image Uploaded', default=False)
+    diagnosis_validated = fields.Boolean(string='Diagnosis Validated', default=False)
+    dispatch_done = fields.Boolean(string='Dispatched', default=False, readonly=True, tracking=True)
+    credit_limit_request_sent = fields.Boolean(string='Credit Limit Request Sent', default=False)
+    credit_limit_approved = fields.Boolean(string='Credit Limit Approved', default=False)
+    rug_repriced = fields.Boolean(string='RUG Repriced to Standard', default=False)
+    advance_invoice_created = fields.Boolean(string='Advance Invoice Created', default=False)
+    insufficient_inventory = fields.Boolean(
+        string='Insufficient Inventory',
+        compute='_compute_insufficient_inventory', store=False
+    )
+
+    # --- Quotation & Financial Dates ---
+    quotation_expiry_date = fields.Date(string='Quotation Expiry Date', tracking=True)
 
     # --- Audit & User Tracking ---
     cancelled_by = fields.Many2one('res.users', string='Cancelled By')
@@ -209,6 +228,29 @@ class HelpdeskTicket(models.Model):
             else:
                 ticket.user_location_validation = self.env.user in loc.users_stock_location
 
+    def _compute_insufficient_inventory(self):
+        for ticket in self:
+            if not ticket.items or not ticket.repair_location:
+                ticket.insufficient_inventory = False
+                continue
+            warehouse = self.env['stock.warehouse'].search(
+                [('lot_stock_id', '=', ticket.repair_location.id)], limit=1
+            )
+            if not warehouse:
+                ticket.insufficient_inventory = False
+                continue
+            location = warehouse.lot_stock_id
+            insufficient = False
+            for product in ticket.items:
+                quant = self.env['stock.quant'].search([
+                    ('product_id', '=', product.id),
+                    ('location_id', 'child_of', location.id),
+                ], limit=1)
+                if not quant or quant.quantity < 1:
+                    insufficient = True
+                    break
+            ticket.insufficient_inventory = insufficient
+
     @api.depends('picking_id', 'picking_id.helpdesk_ticket_id')
     def _compute_picking_ids(self):
         for ticket in self:
@@ -240,14 +282,18 @@ class HelpdeskTicket(models.Model):
 
     def action_create_serial_number(self):
         """Create a new stock.lot serial number for this repair ticket.
-        All repair types may create an internal tracking serial — even "Without Serial No"
-        types where the customer did not provide one. The system assigns one for traceability.
+        - For 'Without Serial No' type: uses repair.temp.serial sequence (REP/SER/YYYY/NNN)
+        - For all other types: uses the ticket name as the lot name
         """
         self.ensure_one()
         if self.repair_serial_created:
             raise UserError(_('A serial number has already been created for this ticket.'))
+        if self.normal_repair_without_serial_no:
+            serial_name = self.env['ir.sequence'].next_by_code('repair.temp.serial') or self.name
+        else:
+            serial_name = self.name
         lot = self.env['stock.lot'].create({
-            'name': self.name,
+            'name': serial_name,
             'company_id': self.company_id.id or self.env.company.id,
             'product_id': self.items[:1].id if self.items else False,
         })
@@ -262,16 +308,27 @@ class HelpdeskTicket(models.Model):
     # =========================================================================
 
     def action_cancel_ticket(self):
-        """Cancel the repair ticket with full audit trail."""
+        """Cancel the repair ticket with full audit trail.
+        If cancellation reason is 'customer_request' at quotation stage,
+        ticket moves to 'Repair Completed' (physical return still needed).
+        """
         self.ensure_one()
         if self.cancelled:
             raise UserError(_('This ticket is already cancelled.'))
-        self.write({
+        vals = {
             'cancelled': True,
             'cancelled_date': fields.Datetime.now(),
             'cancelled_by': self.env.uid,
             'cancelled_stage_id': self.stage_id.id,
-        })
+        }
+        # Customer declined quotation → move to Repair Completed for physical return
+        if self.cancel_status == 'customer_request' and self.sale_order:
+            completed_stage = self.env['helpdesk.stage'].search(
+                [('name', 'ilike', 'Repair Completed')], limit=1
+            )
+            if completed_stage:
+                vals['stage_id'] = completed_stage.id
+        self.write(vals)
 
     def action_reopen_ticket(self):
         """Reopen a cancelled repair ticket."""
@@ -325,7 +382,7 @@ class HelpdeskTicket(models.Model):
         })
 
     def action_reject_rug(self):
-        """Reject RUG request."""
+        """Reject RUG request. Pricing must be updated to standard repair rates."""
         self.ensure_one()
         if self.rug_approval_status != 'pending':
             raise UserError(_('RUG rejection is only possible when status is Pending.'))
@@ -333,6 +390,10 @@ class HelpdeskTicket(models.Model):
             'rug_approval_status': 'rejected',
             'rug_approved': False,
         })
+        self.message_post(
+            body=_('RUG approval rejected. Pricing must be updated to standard repair rates '
+                   'before proceeding. Please update the quotation and resubmit.')
+        )
 
     # =========================================================================
     # REPAIR ROUTE & STOCK PICKING (FR-005)
@@ -458,6 +519,11 @@ class HelpdeskTicket(models.Model):
                 'Repair Reason is required before planning the intervention. '
                 'Please set the Repair Reason field.'
             ))
+        if not self.image_uploaded:
+            raise UserError(_(
+                'At least one pump image must be uploaded before planning the intervention. '
+                'Please upload an image in the Related Information or Warranty Card field.'
+            ))
         self.write({'repair_started_stage_updated': True})
         has_task_ids = 'task_ids' in self.env['helpdesk.ticket']._fields
         return {
@@ -471,3 +537,79 @@ class HelpdeskTicket(models.Model):
                 'default_is_fsm': True,
             },
         }
+
+    def action_tested_ok(self):
+        """Mark repair as Tested OK — no parts needed, no charge.
+        Bypasses quotation and invoicing. Dispatch enabled immediately.
+        """
+        self.ensure_one()
+        if not self.receive_at_factory:
+            raise UserError(_('Item must be received at factory before marking as Tested OK.'))
+        if self.tested_ok:
+            raise UserError(_('This ticket has already been marked as Tested OK.'))
+        # Find the "Repair Completed" stage
+        completed_stage = self.env['helpdesk.stage'].search(
+            [('name', 'ilike', 'Repair Completed')], limit=1
+        )
+        vals = {
+            'tested_ok': True,
+            'handed_over': False,
+        }
+        if completed_stage:
+            vals['stage_id'] = completed_stage.id
+        self.write(vals)
+
+    def action_dispatch(self):
+        """Final dispatch — return repaired item to customer.
+        Payment gate:
+        - Tested OK repairs: no payment required.
+        - Cash customers: full invoice must be paid (valid_invoiced_so = True).
+        - Credit customers: invoice must be generated (valid_invoiced_so = True).
+        """
+        self.ensure_one()
+        if not self.receive_at_centre and not self.tested_ok:
+            raise UserError(_(
+                'Item must be received at the sales centre before dispatch, '
+                'unless the repair was marked as Tested OK.'
+            ))
+        if not self.tested_ok and not self.valid_invoiced_so:
+            raise UserError(_(
+                'The invoice must be fully paid before dispatch is enabled.'
+            ))
+        # Create return picking to customer
+        customer_location = self.env.ref('stock.stock_location_customers')
+        source_loc = self.repair_location or self.return_receipt_location
+        if not source_loc:
+            raise UserError(_('Repair Location must be set to create a dispatch transfer.'))
+        picking_type = self.env['stock.picking.type'].search([
+            ('code', '=', 'outgoing'),
+        ], limit=1)
+        if picking_type:
+            self.env['stock.picking'].create({
+                'picking_type_id': picking_type.id,
+                'location_id': source_loc.id,
+                'location_dest_id': customer_location.id,
+                'origin': self.name,
+                'helpdesk_ticket_id': self.id,
+            })
+        self.write({
+            'dispatch_done': True,
+            'handed_over': True,
+            'stage_date': fields.Datetime.now(),
+        })
+
+    def action_request_credit_limit(self):
+        """Request Finance Department approval for credit limit override."""
+        self.ensure_one()
+        if self.customer_type != 'credit':
+            raise UserError(_('Credit limit approval is only for credit customers.'))
+        if self.credit_limit_request_sent:
+            raise UserError(_('Credit limit approval request has already been sent.'))
+        self.write({'credit_limit_request_sent': True})
+
+    def action_approve_credit_limit(self):
+        """Approve credit limit override — Finance/Accounts Dept only."""
+        self.ensure_one()
+        if not self.credit_limit_request_sent:
+            raise UserError(_('No credit limit approval request has been sent.'))
+        self.write({'credit_limit_approved': True})

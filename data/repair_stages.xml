@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <record id="stage_new" model="helpdesk.stage">
+        <field name="name">New</field>
+        <field name="sequence">1</field>
+    </record>
+    <record id="stage_item_received" model="helpdesk.stage">
+        <field name="name">Item Received</field>
+        <field name="sequence">2</field>
+    </record>
+    <record id="stage_sent_to_factory" model="helpdesk.stage">
+        <field name="name">Sent to Factory</field>
+        <field name="sequence">3</field>
+    </record>
+    <record id="stage_received_at_factory" model="helpdesk.stage">
+        <field name="name">Received at Factory</field>
+        <field name="sequence">4</field>
+    </record>
+    <record id="stage_repair_started" model="helpdesk.stage">
+        <field name="name">Repair Started</field>
+        <field name="sequence">5</field>
+    </record>
+    <record id="stage_quotation" model="helpdesk.stage">
+        <field name="name">Quotation</field>
+        <field name="sequence">6</field>
+    </record>
+    <record id="stage_quotation_sent" model="helpdesk.stage">
+        <field name="name">Quotation Sent to Customer</field>
+        <field name="sequence">7</field>
+    </record>
+    <record id="stage_so_confirmed" model="helpdesk.stage">
+        <field name="name">SO Confirmed</field>
+        <field name="sequence">8</field>
+    </record>
+    <record id="stage_repair_completed" model="helpdesk.stage">
+        <field name="name">Repair Completed</field>
+        <field name="sequence">9</field>
+    </record>
+    <record id="stage_sent_to_centre" model="helpdesk.stage">
+        <field name="name">Sent to Sales Centre</field>
+        <field name="sequence">10</field>
+    </record>
+    <record id="stage_received_at_centre" model="helpdesk.stage">
+        <field name="name">Received at Sales Centre</field>
+        <field name="sequence">11</field>
+    </record>
+    <record id="stage_dispatched" model="helpdesk.stage">
+        <field name="name">Dispatched</field>
+        <field name="sequence">12</field>
+    </record>
+    <record id="stage_handed_over" model="helpdesk.stage">
+        <field name="name">Handed Over to Customer</field>
+        <field name="sequence">13</field>
+        <field name="fold">True</field>
+    </record>
+</odoo>

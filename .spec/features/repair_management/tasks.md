@@ -944,17 +944,19 @@ one testable Odoo feature or component, and follows Odoo 17 coding conventions (
         `company_id` set; switch to company B context → verify stage not visible
   - Acceptance criteria:
     - `test_full_rug_workflow` completes without any exception
+    - `test_full_rug_workflow` verifies correct order: factory before centre
     - `test_full_rug_workflow` verifies `rug_approved = True`, `rug_confirmed = True` (from type),
-      `receive_at_factory = True` in final state
+      `receive_at_factory = True`, `receive_at_centre = True`, `repair_started_stage_updated = True`
     - `test_full_external_not_rug_workflow` verifies `rug_approved = False`, `rug_confirmed = False`,
-      `receive_at_factory = True` — i.e. factory reached without any approval step
+      `receive_at_factory = True` — factory reached without any approval step
     - `test_full_serial_workflow` verifies `repair_serial_created = True` and linked lot
-    - `test_no_serial_workflow` verifies `normal_repair_without_serial_no = True`
+    - `test_no_serial_workflow` verifies `repair_serial_created = True` (serial created as internal
+      reference — no longer blocked for this type)
     - Multi-company stage test verifies domain filtering
   - Dependencies: Task 8.1
   - Complexity: M
   - _Leverage: odoo.tests.common.TransactionCase_
-  - _Requirements: FR-001 through FR-019 (integration coverage)_
+  - _Requirements: FR-001 through FR-014 (integration coverage)_
 
 ---
 
@@ -992,6 +994,28 @@ one testable Odoo feature or component, and follows Odoo 17 coding conventions (
 | 7.3 | 5.1, 7.1 |
 | 8.1 | 3.1-4.3 |
 | 8.2 | 8.1 |
+| 9.1 | 3.4, 3.5, 4.1 |
+| 9.2 | 3.4, 9.1 |
+| 9.3 | 3.2 |
+| 9.4 | 3.5, 5.1 |
+| 9.5 | 2.4, 2.5 |
+| 9.6 | 1.3, 2.3 |
+| 9.7 | 4.1, 4.3, 9.6 |
+| 9.8 | 9.1-9.7, 8.1, 8.2 |
+| 10.1 | 2.3 |
+| 10.2 | 2.4, 10.1 |
+| 10.3 | 2.5, 4.3 |
+| 10.4 | 2.5, 4.2 |
+| 10.5 | 2.4, 4.1, 10.12 |
+| 10.6 | 2.5, 9.7 |
+| 10.7 | 2.4, 3.5, 10.1, 10.2, 10.5 |
+| 10.8 | 3.4 |
+| 10.9 | 2.1, 3.4, 10.7 |
+| 10.10 | 1.2, 3.2 |
+| 10.11 | 3.3, 10.12 |
+| 10.12 | 2.2 |
+| 10.13 | 3.5 |
+| 10.14 | 1.3, 1.4, 2.5 |
 
 ---
 
@@ -1028,10 +1052,179 @@ one testable Odoo feature or component, and follows Odoo 17 coding conventions (
 
 ---
 
+## Phase 9: Workflow Alignment Fixes
+
+These tasks correct the movement order, RUG approval timing, serial restriction removal, return
+transfer relabelling, 50% advance payment, repair reason mandatory gate, and Plan Intervention
+action — aligning the implementation with the end-user documentation.
+
+- [x] 9.1. Fix movement order — factory FIRST, sales centre AFTER repair (FR-006)
+  - Files to modify:
+    - `jinstage_helpdesk_repair/models/helpdesk_ticket.py`
+    - `jinstage_helpdesk_repair/views/helpdesk_ticket_views.xml`
+  - Implementation steps:
+    - Remove centre prerequisite from `action_send_to_factory`; add `picking_count > 0` guard only
+    - Remove RUG approval gate from `action_send_to_factory` (gate moved to SO confirmation)
+    - Update `action_send_to_centre` guard: requires `receive_at_factory = True`
+    - Update button visibility in XML:
+      - Send to Factory: `invisible="send_to_factory or picking_count == 0"` (no centre check)
+      - Send to Sales Centre: `invisible="send_to_centre or not receive_at_factory"`
+  - Acceptance criteria:
+    - `action_send_to_factory` requires only `picking_count > 0`, raises `UserError` if zero
+    - `action_send_to_centre` raises `UserError` if `receive_at_factory = False`
+    - Buttons show/hide in correct order: factory buttons before centre buttons
+  - Dependencies: Tasks 3.4, 3.5, 4.1
+  - Complexity: S
+  - _Requirements: FR-006_
+
+- [x] 9.2. Fix RUG approval timing — after quotation, before SO confirmation (FR-007)
+  - Files to modify:
+    - `jinstage_helpdesk_repair/models/helpdesk_ticket.py`
+  - Implementation steps:
+    - In `action_send_rug_request`: add guard `if not self.sale_order: raise UserError(...)`
+    - Remove RUG approval guard from `action_send_to_factory` (no longer gates factory)
+    - Document in code: approval flow is Plan Intervention → Add Products → Quotation Created
+      → Request RUG Approval → Approved → Customer Confirms SO
+  - Acceptance criteria:
+    - `action_send_rug_request` raises `UserError` when `sale_order` is not set
+    - `action_send_to_factory` no longer raises `UserError` for unapproved RUG tickets
+    - Unit test `test_rug_request_requires_sale_order` passes
+  - Dependencies: Task 3.4, 9.1
+  - Complexity: S
+  - _Requirements: FR-007_
+
+- [x] 9.3. Remove serial creation restriction for "Without Serial No" type (FR-003)
+  - Files to modify:
+    - `jinstage_helpdesk_repair/models/helpdesk_ticket.py`
+    - `jinstage_helpdesk_repair/views/helpdesk_ticket_views.xml`
+  - Implementation steps:
+    - Remove `if self.normal_repair_without_serial_no: raise UserError(...)` from
+      `action_create_serial_number`
+    - Update button visibility: remove `or normal_repair_without_serial_no == True` condition
+    - Add docstring note: for "Without Serial No" type, created serial is internal reference only
+  - Acceptance criteria:
+    - `action_create_serial_number` succeeds for all four repair types
+    - "Create Serial Number" button visible for all types when `repair_serial_created = False`
+    - Unit test confirms serial creation for `normal_repair_without_serial_no = True` tickets
+  - Dependencies: Task 3.2
+  - Complexity: XS
+  - _Requirements: FR-003_
+
+- [x] 9.4. Rename "Create Repair Route" to "Create Return Transfer" and "Pickings" to "Repair Trans" (FR-005)
+  - Files to modify:
+    - `jinstage_helpdesk_repair/views/helpdesk_ticket_views.xml`
+    - `jinstage_helpdesk_repair/models/helpdesk_ticket.py` — update `action_view_pickings` label
+  - Implementation steps:
+    - Update button string: `string="Create Return Transfer"`
+    - Update smart button statinfo string: `string="Repair Trans"`
+    - Update `action_view_pickings` return dict: `'name': _('Repair Transfers')`
+    - Add popup dialog (wizard or `return_picking_type_id` selection) to confirm return location
+      before creating the reverse transfer picking
+  - Acceptance criteria:
+    - Button shows "Create Return Transfer" on the form header
+    - Smart button shows "Repair Trans" label with correct picking count
+    - `action_view_pickings` window title is "Repair Transfers"
+    - Dialog/popup prompts user to confirm return location before transfer creation
+  - Dependencies: Task 3.5, 5.1
+  - Complexity: S
+  - _Requirements: FR-005_
+
+- [x] 9.5. Add 50% advance payment boolean flag and document two-invoice workflow (FR-012)
+  - Files to modify:
+    - `jinstage_helpdesk_repair/models/helpdesk_ticket.py` — add `advance_invoice_created` field
+    - `jinstage_helpdesk_repair/views/helpdesk_ticket_views.xml` — add field to Extra Info tab
+  - Implementation steps:
+    - Add `advance_invoice_created = fields.Boolean(string='Advance Invoice Created',
+      default=False, tracking=True)` to `helpdesk.ticket`
+    - Display `advance_invoice_created` in the Sale Order Flags group of Extra Info tab
+    - Document in code comments the two-invoice workflow:
+      SO Confirmed → 50% Advance Invoice (advance_invoice_created=True) → Repair
+      → Balance Invoice → Handover
+    - No custom model required — standard Odoo SO Down Payment invoicing used for both invoices
+  - Acceptance criteria:
+    - `advance_invoice_created` field exists in `helpdesk_ticket` database table
+    - Field visible in Extra Info tab, defaults to False
+    - Field tracked in chatter log when set to True
+    - No custom invoice model created (uses standard Odoo invoicing)
+  - Dependencies: Tasks 2.4, 2.5
+  - Complexity: XS
+  - _Requirements: FR-012_
+
+- [x] 9.6. Add `repair_reason_id` field and mandatory guard (FR-013)
+  - Files to modify:
+    - `jinstage_helpdesk_repair/models/helpdesk_ticket.py`
+    - `jinstage_helpdesk_repair/views/helpdesk_ticket_views.xml`
+    - `jinstage_helpdesk_repair/security/ir.model.access.csv` — verify `jinstage.repair.reason`
+      access rows already present from Task 1.4
+  - Implementation steps:
+    - Add `repair_reason_id = fields.Many2one('jinstage.repair.reason', string='Repair Reason',
+      tracking=True)` to `helpdesk.ticket`
+    - Add field to Repair Classification group in the Repair Info tab
+    - Implement guard in `action_plan_intervention`: if not `self.repair_reason_id`,
+      raise `UserError(_('Please set a Repair Reason before planning an intervention.'))`
+  - Acceptance criteria:
+    - `repair_reason_id` column exists in `helpdesk_ticket` database table
+    - Field visible in Repair Info tab Repair Classification group
+    - `action_plan_intervention` raises `UserError` when `repair_reason_id` is not set
+    - Field tracks changes in chatter
+  - Dependencies: Tasks 1.3, 2.3
+  - Complexity: S
+  - _Requirements: FR-013_
+
+- [x] 9.7. Implement `action_plan_intervention` method (FR-014)
+  - Files to modify:
+    - `jinstage_helpdesk_repair/models/helpdesk_ticket.py`
+    - `jinstage_helpdesk_repair/views/helpdesk_ticket_views.xml` — add Plan Intervention button
+  - Implementation steps:
+    - Implement `action_plan_intervention(self)`:
+      - `ensure_one()`
+      - Guard: raise `UserError` if `not self.receive_at_factory`
+      - Guard: raise `UserError` if `not self.repair_reason_id`
+      - Write: `repair_started_stage_updated = True`
+      - Return `self.action_view_fsm_tasks()` (delegates to helpdesk_fsm integration)
+    - Add button to form header:
+      `<button name="action_plan_intervention" string="Plan Intervention"
+               invisible="receive_at_factory == False or repair_started_stage_updated == True"/>`
+    - Add `repair_started_stage_updated` to hidden fields in sheet xpath if not already present
+  - Acceptance criteria:
+    - Button visible when `receive_at_factory = True` and `repair_started_stage_updated = False`
+    - Button hidden once `repair_started_stage_updated = True`
+    - Method raises `UserError` when either guard fails
+    - Method sets `repair_started_stage_updated = True` and returns FSM task action
+    - Unit test `test_plan_intervention_success` passes
+  - Dependencies: Tasks 4.1, 4.3, 9.6
+  - Complexity: S
+  - _Requirements: FR-014_
+
+- [x] 9.8. Update integration tests for corrected workflow (all FR changes)
+  - Files to modify:
+    - `jinstage_helpdesk_repair/tests/test_repair_workflow.py`
+    - `jinstage_helpdesk_repair/tests/test_repair_integration.py`
+  - Implementation steps:
+    - Update `TestRUGWorkflow`: replace `test_factory_blocked_without_approval` with
+      `test_factory_no_longer_blocked_by_rug_approval` (factory gate removed)
+    - Add `test_rug_request_requires_sale_order` test
+    - Add `TestMovementOrder` class with `test_factory_requires_return_transfer` and
+      `test_centre_requires_receive_at_factory` tests
+    - Add `TestPlanIntervention` class with three test methods (see 8.1 update)
+    - Update `test_full_rug_workflow` integration test to use correct order:
+      return transfer → factory → plan intervention → RUG request (with SO) → centre
+    - Update `test_no_serial_workflow` to verify serial creation succeeds (not raises)
+  - Acceptance criteria:
+    - All existing tests still pass
+    - New tests cover FR-006, FR-007, FR-013, FR-014 corrected behaviour
+    - `test_full_rug_workflow` uses factory-first order
+    - `test_no_serial_workflow` verifies serial creation is allowed
+  - Dependencies: Tasks 9.1 through 9.7, 8.1, 8.2
+  - Complexity: M
+  - _Requirements: FR-003, FR-005, FR-006, FR-007, FR-012, FR-013, FR-014_
+
+---
+
 ## Deployment Checklist
 
 ### Pre-Production Deployment
-- [ ] All 32 tasks implemented and accepted
+- [ ] All 54 tasks implemented and accepted (32 original + 8 Phase 9 alignment + 14 Phase 10 gap tasks)
 - [ ] All unit tests pass (`test_repair_workflow.py`)
 - [ ] All integration tests pass (`test_repair_integration.py`)
 - [ ] Module installs on clean Odoo 17 Enterprise database
@@ -1050,6 +1243,320 @@ one testable Odoo feature or component, and follows Odoo 17 coding conventions (
 - [ ] Create repair-specific helpdesk ticket types (RUG, Normal Serial, Normal No Serial)
 - [ ] Configure `users_stock_location` on applicable stock locations
 - [ ] Remove Studio customisations from the Helpdesk app after migration verification
+
+---
+
+## Phase 10: FRD Gap Incorporation (14 Gaps)
+
+These tasks close the gaps identified between the Functional Requirement Document and the original
+spec. Each task is self-contained and maps 1:1 to a numbered gap.
+
+- [x] 10.1. GAP-01 — Add `customer_type` field (cash/credit) to `helpdesk.ticket`
+  - Files to modify:
+    - `jinstage_helpdesk_repair/models/helpdesk_ticket.py`
+    - `jinstage_helpdesk_repair/views/helpdesk_ticket_views.xml`
+  - Implementation steps:
+    - Add `customer_type = fields.Selection([('cash', 'Cash'), ('credit', 'Credit')],
+      string='Customer Type', default='cash', tracking=True)` to `helpdesk.ticket`
+    - Add field to Repair Info tab (Repair Classification group)
+    - Document business rules: cash = 50% advance + 100% final; credit = credit limit check first
+  - Acceptance criteria:
+    - `customer_type` defaults to `'cash'` on new tickets
+    - Field appears in Repair Info tab
+    - Field tracked in chatter when changed
+  - Dependencies: Task 2.3
+  - Complexity: XS
+  - _Requirements: FR-NEW-01_
+
+- [x] 10.2. GAP-02 — Credit limit validation workflow
+  - Files to modify:
+    - `jinstage_helpdesk_repair/models/helpdesk_ticket.py`
+    - `jinstage_helpdesk_repair/views/helpdesk_ticket_views.xml`
+  - Implementation steps:
+    - Add `credit_limit_request_sent` and `credit_limit_approved` boolean fields
+    - Implement `action_request_credit_limit` method with guards and chatter post
+    - Add "Request Credit Limit" button to form header:
+      `invisible="customer_type != 'credit' or credit_limit_request_sent == True"`
+    - Add fields to Extra Info tab under Workflow Status group
+  - Acceptance criteria:
+    - `action_request_credit_limit` raises `UserError` for non-credit customers
+    - `action_request_credit_limit` raises `UserError` if already sent
+    - Chatter message posted on request
+    - Button visible only for credit customers who have not yet sent the request
+  - Dependencies: Tasks 2.4, 10.1
+  - Complexity: S
+  - _Requirements: FR-NEW-02_
+
+- [x] 10.3. GAP-03 — Quotation 25-day expiry computed field
+  - Files to modify:
+    - `jinstage_helpdesk_repair/models/helpdesk_ticket.py`
+    - `jinstage_helpdesk_repair/views/helpdesk_ticket_views.xml`
+  - Implementation steps:
+    - Add `quotation_expiry_date = fields.Date(compute='_compute_quotation_expiry_date', store=True)`
+    - Implement `_compute_quotation_expiry_date` with `@api.depends('sale_order',
+      'sale_order.create_date')` — SO creation date + 25 days
+    - Display `quotation_expiry_date` in Extra Info tab (Sale Order Flags group)
+    - Add guard in quotation confirmation logic: if `quotation_expiry_date < date.today()`,
+      raise `UserError`
+    - Add automation rule comment in `automation_rules.xml` noting expiry is computed not ruled
+  - Acceptance criteria:
+    - `quotation_expiry_date` populated 25 days after SO creation
+    - `quotation_expiry_date` is False when no `sale_order`
+    - Guard raises `UserError` when today exceeds `quotation_expiry_date`
+    - Field recomputes when `sale_order` changes
+  - Dependencies: Tasks 2.5, 4.3
+  - Complexity: S
+  - _Requirements: FR-NEW-03_
+
+- [x] 10.4. GAP-04 — Insufficient inventory computed boolean block
+  - Files to modify:
+    - `jinstage_helpdesk_repair/models/helpdesk_ticket.py`
+    - `jinstage_helpdesk_repair/views/helpdesk_ticket_views.xml`
+  - Implementation steps:
+    - Add `insufficient_inventory = fields.Boolean(compute='_compute_insufficient_inventory',
+      store=False)`
+    - Implement `_compute_insufficient_inventory` with `@api.depends('items',
+      'repair_location')` — searches `stock.quant` for each product in `items` at
+      `repair_location`; True if any product quantity <= 0
+    - Add warning message in form view visible when `insufficient_inventory == True`:
+      `<div class="alert alert-warning" invisible="insufficient_inventory == False">`
+    - Add `insufficient_inventory` to hidden fields xpath for domain expressions
+  - Acceptance criteria:
+    - `insufficient_inventory = True` when any item has qty <= 0 in repair location
+    - `insufficient_inventory = False` when `items` is empty or all items have stock
+    - Warning banner visible in form when `insufficient_inventory = True`
+    - Quotation confirmation action blocks when `insufficient_inventory = True`
+  - Dependencies: Tasks 2.5, 4.2
+  - Complexity: M
+  - _Requirements: FR-NEW-04_
+
+- [x] 10.5. GAP-05 — "Tested OK" workflow
+  - Files to modify:
+    - `jinstage_helpdesk_repair/models/helpdesk_ticket.py`
+    - `jinstage_helpdesk_repair/views/helpdesk_ticket_views.xml`
+  - Implementation steps:
+    - Add `tested_ok = fields.Boolean(string='Tested OK', default=False, tracking=True)`
+    - Implement `action_tested_ok` method:
+      - Guards: `receive_at_factory` must be True; `fsm_task_done` must be False
+      - Sets `tested_ok = True`, moves ticket to "Repair Completed" stage
+    - Add "Tested OK" button to form header:
+      `invisible="tested_ok == True or receive_at_factory == False or fsm_task_done == True"`
+    - Update `action_dispatch` to skip payment gate when `tested_ok = True`
+    - Add `tested_ok` to hidden fields xpath
+  - Acceptance criteria:
+    - `action_tested_ok` raises `UserError` if `receive_at_factory = False`
+    - `action_tested_ok` raises `UserError` if `fsm_task_done = True`
+    - Ticket moves to "Repair Completed" stage on success
+    - Dispatch available immediately after `tested_ok = True`
+  - Dependencies: Tasks 2.4, 4.1, 10.12 (GAP-12 stages must exist)
+  - Complexity: S
+  - _Requirements: FR-NEW-05_
+
+- [x] 10.6. GAP-06 — Mandatory image upload and diagnosis validation
+  - Files to modify:
+    - `jinstage_helpdesk_repair/models/helpdesk_ticket.py`
+    - `jinstage_helpdesk_repair/views/helpdesk_ticket_views.xml`
+  - Implementation steps:
+    - Add `image_uploaded = fields.Boolean(compute='_compute_image_uploaded', store=True)`
+    - Implement `_compute_image_uploaded` with `@api.depends('related_information',
+      'warranty_card')` — True when either field has a value
+    - Add `diagnosis_validated = fields.Boolean(string='Diagnosis Validated',
+      default=False, tracking=True)`
+    - Update `action_plan_intervention`: add guard `if not self.image_uploaded: raise UserError`
+    - Add both fields to Repair Info tab
+    - Add `diagnosis_validated` check comment in FSM task product-add path
+  - Acceptance criteria:
+    - `image_uploaded = True` when `warranty_card` or `related_information` is populated
+    - `image_uploaded = False` when both fields are empty
+    - `action_plan_intervention` raises `UserError` when `image_uploaded = False`
+    - `diagnosis_validated` visible in Repair Info tab and tracked in chatter
+  - Dependencies: Tasks 2.5, 9.7
+  - Complexity: S
+  - _Requirements: FR-NEW-06_
+
+- [x] 10.7. GAP-07 — `action_dispatch` with payment gate
+  - Files to modify:
+    - `jinstage_helpdesk_repair/models/helpdesk_ticket.py`
+    - `jinstage_helpdesk_repair/views/helpdesk_ticket_views.xml`
+  - Implementation steps:
+    - Add `dispatch_done = fields.Boolean(string='Dispatched', readonly=True,
+      default=False, tracking=True)`
+    - Implement `action_dispatch` method with guards:
+      - Cash: `valid_invoiced_so` must be True (unless `tested_ok = True`)
+      - Credit: `credit_limit_approved` must be True (unless `tested_ok = True`)
+      - RUG: `rug_approved` must be True
+      - Sets `handed_over = True`, `dispatch_done = True`
+      - Creates stock Return Operation picking from `repair_location` → customer location
+    - Add "Dispatch" button to form header:
+      `invisible="dispatch_done == True or (receive_at_centre == False and tested_ok == False)"`
+    - Add `dispatch_done` to Extra Info tab (readonly)
+  - Acceptance criteria:
+    - Cash customer dispatch blocked when `valid_invoiced_so = False` and `tested_ok = False`
+    - Credit customer dispatch blocked when `credit_limit_approved = False` and `tested_ok = False`
+    - `tested_ok = True` bypasses payment gate
+    - `handed_over = True` and `dispatch_done = True` set atomically
+    - Stock Return Operation picking created and linked to ticket
+  - Dependencies: Tasks 2.4, 3.5, 10.1, 10.2, 10.5
+  - Complexity: M
+  - _Requirements: FR-NEW-07_
+
+- [x] 10.8. GAP-08 — RUG rejection repricing chatter and `rug_repriced` field
+  - Files to modify:
+    - `jinstage_helpdesk_repair/models/helpdesk_ticket.py`
+  - Implementation steps:
+    - Add `rug_repriced = fields.Boolean(string='RUG Repriced', default=False, tracking=True)`
+    - Update `action_reject_rug`:
+      - Write `rug_repriced = False` (flag that repricing has not been done)
+      - Post chatter message: "RUG approval rejected. Pricing must be updated to standard repair
+        rates before the repair can proceed. Please revise the quotation accordingly."
+    - Add `rug_repriced` to Extra Info tab (RUG Approval group), readonly until manager sets True
+  - Acceptance criteria:
+    - `action_reject_rug` posts chatter message on rejection
+    - `rug_repriced = False` set when rejection occurs
+    - Manager can manually set `rug_repriced = True` after repricing the quotation
+    - Chatter message visible in ticket audit trail
+  - Dependencies: Task 3.4
+  - Complexity: XS
+  - _Requirements: FR-007 (GAP-08)_
+
+- [x] 10.9. GAP-09 — RUG account on ticket type + dispatch gate for RUG
+  - Files to modify:
+    - `jinstage_helpdesk_repair/models/helpdesk_ticket_type.py`
+    - `jinstage_helpdesk_repair/views/helpdesk_ticket_type_views.xml`
+    - `jinstage_helpdesk_repair/models/helpdesk_ticket.py` — update `action_dispatch`
+  - Implementation steps:
+    - Add `rug_account_id = fields.Many2one('account.account', string='RUG Account',
+      help='GL account for final RUG repair invoices.')` to `helpdesk.ticket.type`
+    - Add `rug_account_id` to the ticket type form/tree views
+    - In `action_dispatch`: add guard for RUG tickets —
+      `if self.rug_confirmed and not self.rug_approved: raise UserError`
+    - Add note in code: RUG invoices should be posted against `ticket_type_id.rug_account_id`
+  - Acceptance criteria:
+    - `helpdesk.ticket.type` has `rug_account_id` Many2one field
+    - Ticket type form shows `rug_account_id` field (only relevant for RUG types)
+    - `action_dispatch` blocks for RUG tickets when `rug_approved = False`
+    - `action_dispatch` blocks for RUG tickets when `valid_invoiced_so = False`
+  - Dependencies: Tasks 2.1, 3.4, 10.7
+  - Complexity: S
+  - _Requirements: FR-NEW (GAP-09)_
+
+- [x] 10.10. GAP-10 — Temporary serial sequence for "Without Serial No" type
+  - Files to modify:
+    - `jinstage_helpdesk_repair/data/ir_sequence_data.xml`
+    - `jinstage_helpdesk_repair/models/helpdesk_ticket.py`
+  - Implementation steps:
+    - Add `repair.temp.serial` sequence to `ir_sequence_data.xml`:
+      prefix `REP/SER/%(year)s/`, padding 3
+    - Update `action_create_serial_number`: when `normal_repair_without_serial_no = True`,
+      use `env['ir.sequence'].next_by_code('repair.temp.serial')` as the lot name instead of
+      `self.name`
+    - All other types continue to use `self.name` as the lot name
+  - Acceptance criteria:
+    - `repair.temp.serial` sequence exists in database after install
+    - `action_create_serial_number` for "Without Serial No" type generates lot name from temp
+      serial sequence (e.g. `REP/SER/2026/001`)
+    - All other types continue to use ticket reference as lot name
+    - Sequence increments correctly on each call
+  - Dependencies: Tasks 1.2, 3.2
+  - Complexity: S
+  - _Requirements: FR-003 (GAP-10)_
+
+- [x] 10.11. GAP-11 — Customer-declined cancel → "Repair Completed" stage (not cancelled)
+  - Files to modify:
+    - `jinstage_helpdesk_repair/models/helpdesk_ticket.py`
+    - `jinstage_helpdesk_repair/views/helpdesk_ticket_views.xml`
+  - Implementation steps:
+    - Add `'customer_declined'` to `cancel_status` selection values:
+      `('customer_declined', 'Customer Declined Quotation')`
+    - Update `action_cancel_ticket`: when `cancel_status == 'customer_declined'`:
+      - Do NOT set `cancelled = True`
+      - Move ticket to "Repair Completed" stage
+      - Post chatter: "Customer declined quotation. Ticket moved to Repair Completed.
+        Intervention Task must be marked Done manually. Item returned via Sales Centre dispatch."
+    - Standard cancel path (all other reasons) unchanged
+  - Acceptance criteria:
+    - `action_cancel_ticket` with `cancel_status = 'customer_declined'` moves to
+      "Repair Completed" stage (not cancelled)
+    - `cancelled` field remains False for customer-declined tickets
+    - Chatter message posted for customer-declined path
+    - All other cancel reasons continue to set `cancelled = True`
+  - Dependencies: Tasks 3.3, 10.12
+  - Complexity: S
+  - _Requirements: FR-008 (GAP-11)_
+
+- [x] 10.12. GAP-12 — Seed 13 repair stages in `data/repair_stages.xml`
+  - Files to create:
+    - `jinstage_helpdesk_repair/data/repair_stages.xml`
+  - Files to modify:
+    - `jinstage_helpdesk_repair/__manifest__.py` — add `data/repair_stages.xml` after
+      `ir_sequence_data.xml` in `data` list
+  - Implementation steps:
+    - Create 13 `helpdesk.stage` records with sequences 10–130:
+      1. New (seq 10), 2. Item Received (20), 3. Sent to Factory (30),
+      4. Received at Factory (40), 5. Repair Started (50), 6. Quotation (60),
+      7. Quotation Sent to Customer (70), 8. SO Confirmed (80), 9. Repair Completed (90),
+      10. Sent to Sales Centre (100), 11. Received at Sales Centre (110),
+      12. Dispatched (120), 13. Handed Over to Customer (130, `is_close=True`)
+    - All stages have no `company_id` on install (global)
+    - Use `noupdate="1"` to prevent re-seeding on module upgrade
+  - Acceptance criteria:
+    - 13 stage records exist after module installation
+    - "Handed Over to Customer" has `is_close = True`
+    - Stages appear in correct sequence order in the Kanban pipeline
+    - `noupdate="1"` prevents overwriting admin-customised stages on upgrade
+  - Dependencies: Task 2.2
+  - Complexity: S
+  - _Requirements: FR-NEW-08 (GAP-12)_
+
+- [x] 10.13. GAP-13 — Document multiple delivery orders for factory repairs
+  - Files to modify:
+    - `jinstage_helpdesk_repair/models/helpdesk_ticket.py` — add comment block
+    - `jinstage_helpdesk_repair/views/helpdesk_ticket_views.xml` — verify smart button label
+  - Implementation steps:
+    - Add comment block in `_compute_picking_ids` documenting the multi-DO pattern:
+      - Branch repairs: 1 DO (branch → customer)
+      - Centre/Factory repairs: 3+ DOs (branch → factory, factory → centre, centre → customer)
+    - Confirm "Repair Trans" smart button shows total count of all linked DOs
+    - No additional model changes required — existing `picking_count` covers all legs
+    - Add `picking_count` note to design doc (already done via spec update)
+  - Acceptance criteria:
+    - `picking_count` smart button shows the correct total count for multi-DO factory repairs
+    - Comment block in code explains the multi-DO pattern
+    - No new model changes required — existing `helpdesk_ticket_id` link handles all DOs
+  - Dependencies: Task 3.5
+  - Complexity: XS
+  - _Requirements: FR-005 / FR-006 (GAP-13)_
+
+- [x] 10.14. GAP-14 — `jinstage.repair.bom` model for repair BOMs
+  - Files to create:
+    - `jinstage_helpdesk_repair/models/repair_bom.py`
+  - Files to modify:
+    - `jinstage_helpdesk_repair/models/__init__.py` — add import for `repair_bom`
+    - `jinstage_helpdesk_repair/security/ir.model.access.csv` — add 2 rows for
+      `model_jinstage_repair_bom`
+    - `jinstage_helpdesk_repair/views/diagnosis_views.xml` — add BOM list + form views
+    - `jinstage_helpdesk_repair/views/actions.xml` — add `action_repair_bom` act_window
+    - `jinstage_helpdesk_repair/views/menus.xml` — add BOM submenu under Repair Diagnosis
+    - `jinstage_helpdesk_repair/models/helpdesk_ticket.py` — add `action_apply_bom` method
+  - Implementation steps:
+    - Create `jinstage.repair.bom` model with `name`, `repair_type_id`, `product_ids`,
+      `active` fields (see design.md section 7)
+    - `product_ids` uses explicit relation `jinstage_repair_bom_product_rel`
+    - Implement `action_apply_bom(self, bom_id)` on `helpdesk.ticket`: appends BOM products
+      to `items` field (does not replace existing entries)
+    - List view: `name`, `repair_type_id`, `product_ids` (as tag list), `active`
+    - Form view: `name`, `repair_type_id`, `product_ids` (as list widget), `active`
+    - Menu: under `menu_repair_diagnosis_root` as "Repair BOMs", sequence 95
+    - Security: user group read-only; manager group full access
+  - Acceptance criteria:
+    - `jinstage.repair.bom` model exists in database after install
+    - BOM form view allows adding multiple products
+    - `action_apply_bom` appends products to ticket `items` (not replaces)
+    - BOM accessible under Helpdesk > Configuration > Repair Diagnosis > Repair BOMs
+    - Manager-only create/write/delete; users can read
+  - Dependencies: Tasks 1.3, 1.4, 2.5
+  - Complexity: M
+  - _Requirements: FR-NEW-09 (GAP-14)_
 
 ---
 

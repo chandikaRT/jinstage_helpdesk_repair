@@ -10,5 +10,14 @@
             <field name="use_date_range">False</field>
             <field name="company_id" eval="False"/>
         </record>
+        <record id="seq_repair_temp_serial" model="ir.sequence">
+            <field name="name">Repair Temporary Serial</field>
+            <field name="code">repair.temp.serial</field>
+            <field name="prefix">REP/SER/%(year)s/</field>
+            <field name="padding">3</field>
+            <field name="number_increment">1</field>
+            <field name="use_date_range">False</field>
+            <field name="company_id" eval="False"/>
+        </record>
     </data>
 </odoo>

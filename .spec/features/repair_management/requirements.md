@@ -154,6 +154,9 @@ ticket, so that the repaired item is traceable throughout the repair process.
 6. For "Without Serial No" type (`normal_repair_without_serial_no = True`), the system MAY create
    an internal reference serial number when the user explicitly requests it. The serial is used for
    internal tracking only and does not surface as a mandatory step.
+7. **(GAP-10)** "Without Serial No" type uses a dedicated temporary serial sequence `repair.temp.serial`
+   with prefix `REP/SER/%(year)s/` and padding 3. When `action_create_serial_number` is called for
+   this type, the lot name is drawn from `repair.temp.serial` instead of the repair reference.
 
 #### Business Rules
 - Serial creation is available for all repair types, including "Without Serial No".
@@ -162,6 +165,8 @@ ticket, so that the repaired item is traceable throughout the repair process.
   type is removed. The button may be shown for all types at the discretion of the form view.
 - One ticket maps to one serial number (the repaired unit).
 - Serial creation must associate the lot with the correct product from the ticket.
+- **(GAP-10)** Sequence routing: `normal_repair_without_serial_no = True` → use `repair.temp.serial`;
+  all other types → use ticket name as lot name (standard behaviour).
 
 #### Data Requirements
 ```python
@@ -171,6 +176,16 @@ ticket, so that the repaired item is traceable throughout the repair process.
     'serial_number': fields.Many2one('stock.lot', string='Serial Number (Legacy)'),
     'repair_serial_created': fields.Boolean(string='Serial Created', default=False),
     'sn_updated': fields.Boolean(string='SN Updated', default=False),
+}
+
+# Additional ir.sequence record (GAP-10)
+{
+    'name': 'Repair Temp Serial',
+    'code': 'repair.temp.serial',
+    'prefix': 'REP/SER/%(year)s/',
+    'padding': 3,
+    'number_increment': 1,
+    'use_date_range': False,
 }
 ```
 
@@ -231,6 +246,9 @@ automatically without manual data entry.
 5. The smart button "Repair Trans" (previously "Pickings") on the ticket header shows the count of
    linked pickings and opens the filtered list.
 6. `stock.picking` gains a `helpdesk_ticket_id` Many2one field linking back to `helpdesk.ticket`.
+7. **(GAP-13)** Branch repairs generate 1 DO. Centre/Factory repairs generate 3+ DOs (branch →
+   factory, factory → sales centre, sales centre → customer dispatch). The `picking_count` smart
+   button shows the total count of all linked DOs. No additional model is required.
 
 #### Business Rules
 - Return transfer creation is only available when required location fields are set.
@@ -327,6 +345,10 @@ this approval step.
 4. An approver can set `rug_approval_status` to `'approved'` or `'rejected'`.
 5. When approved: `rug_approved = True` and the customer may then confirm the SO.
 6. When rejected: the ticket is blocked from SO confirmation and status shows `'rejected'`.
+   **(GAP-08)** When rejected, `action_reject_rug` also posts a chatter message indicating that
+   pricing must be updated to standard repair rates. Sets `rug_repriced = False` as a follow-up
+   action flag. `rug_account_id` on the ticket type routes the final RUG invoice to the correct
+   GL account (see GAP-09).
 7. When `rug_repair = True` BUT `rug_confirmed = False` (i.e. type is "Under Warranty — External
    not RUG"), the approval buttons are NOT shown and no approval is required. The ticket proceeds
    directly after intake and location setup.
@@ -365,6 +387,13 @@ Plan Intervention → Add Products to FSM Task → Quotation (SO) Created
                                    tracking=True),
     # Note: rug_confirmed on the ticket is a related field from ticket_type_id.is_rug_confirmed
     # (see FR-002). rug_approved is the workflow flag set during the approval process.
+
+    # GAP-08 — RUG Rejection repricing fields
+    'rug_repriced': fields.Boolean(string='RUG Repriced', default=False, tracking=True),
+
+    # GAP-09 — RUG account on ticket type
+    # (defined on helpdesk.ticket.type, not on helpdesk.ticket)
+    # 'rug_account_id': fields.Many2one('account.account', string='RUG Account')
 }
 ```
 
@@ -393,6 +422,22 @@ tickets changed state.
 - Only cancelled tickets can be reopened.
 - All audit fields are readonly after being set.
 - `cancelled_2` is a secondary cancel flag for two-stage cancellation scenarios.
+- **(GAP-11)** When `cancel_reason = 'customer_declined'` (customer declines the quotation),
+  `action_cancel_ticket` moves the ticket to the "Repair Completed" stage instead of any
+  "Cancelled" stage. The Intervention Task must be marked Done manually. The item is returned
+  via Sales Centre dispatch. This path does NOT set `cancelled = True`; it is treated as a
+  completed repair at zero cost.
+
+#### Cancel Reason Values (updated)
+```python
+cancel_status = fields.Selection([
+    ('customer_request', 'Customer Request'),
+    ('beyond_repair', 'Beyond Repair'),
+    ('no_spare_parts', 'No Spare Parts Available'),
+    ('customer_declined', 'Customer Declined Quotation'),  # GAP-11
+    ('other', 'Other'),
+], string='Cancellation Reason', tracking=True)
+```
 
 #### Data Requirements
 ```python
@@ -776,7 +821,7 @@ unauthorised reversals are prevented.
 
 ---
 
-### FR-016 — Kanban Status Visibility
+### FR-018 — Kanban Status Visibility
 
 **Priority:** Low
 
@@ -809,7 +854,7 @@ that I can assess repair progress at a glance without opening individual tickets
 
 ---
 
-### FR-017 — List View Repair Columns
+### FR-019 — List View Repair Columns
 
 **Priority:** Low
 
@@ -825,7 +870,7 @@ columns, so that I can manage repair tickets from the list without needing to op
 
 ---
 
-### FR-018 — FSM Task Integration
+### FR-020 — FSM Task Integration
 
 **Priority:** High
 
@@ -859,7 +904,7 @@ FSM tasks so that field technicians' task completion automatically updates the r
 
 ---
 
-### FR-019 — Stage Change Timestamp
+### FR-021 — Stage Change Timestamp
 
 **Priority:** Medium
 
@@ -877,7 +922,7 @@ so that I can calculate repair cycle times and SLA compliance.
 
 ---
 
-### FR-020 — Reporting Menus
+### FR-022 — Reporting Menus
 
 **Priority:** Low
 
@@ -893,6 +938,390 @@ searches.
    - **Repair Job Details RUG Only** — filtered view for RUG repairs.
    - **Customer Letter Report** — customer communication report.
 3. All menus link to `ir.actions.act_window` actions on `helpdesk.ticket`.
+
+---
+
+---
+
+### FR-NEW-01 — Customer Type Classification (GAP-01)
+
+**Priority:** High
+
+**User Story:** As a service agent, I want to classify each repair customer as "cash" or "credit"
+so that the correct payment and dispatch rules are enforced automatically.
+
+#### Acceptance Criteria
+1. `customer_type` selection field on `helpdesk.ticket` with values `cash` and `credit`.
+2. Cash customers: 50% advance payment required before repair starts; 100% final payment required
+   before dispatch.
+3. Credit customers: credit limit check must be performed first (see FR-NEW-02).
+4. Field visible in the Repair Info tab.
+
+#### Business Rules
+- Default: `cash` (conservative — requires payment before dispatch).
+- Credit path requires `credit_limit_approved = True` before dispatch is available.
+
+#### Data Requirements
+```python
+{
+    'customer_type': fields.Selection([
+        ('cash', 'Cash'),
+        ('credit', 'Credit'),
+    ], string='Customer Type', default='cash', tracking=True),
+}
+```
+
+---
+
+### FR-NEW-02 — Credit Limit Validation Workflow (GAP-02)
+
+**Priority:** High
+
+**User Story:** As a finance officer, I want credit customers whose repair value exceeds their credit
+limit to require Accounts Department approval before dispatch, so that credit exposure is controlled.
+
+#### Acceptance Criteria
+1. When `customer_type = 'credit'` and the repair value exceeds the customer's credit limit,
+   an `action_request_credit_limit` method initiates the approval.
+2. Fields `credit_limit_request_sent` (Boolean) and `credit_limit_approved` (Boolean) track the
+   approval state.
+3. Dispatch (`action_dispatch`) is blocked for credit customers until `credit_limit_approved = True`.
+4. A chatter message is posted when the credit limit request is sent.
+
+#### Business Rules
+- Credit limit check only applies when `customer_type = 'credit'`.
+- Cash customers bypass this workflow entirely.
+- Accounts Dept approval sets `credit_limit_approved = True`.
+
+#### Data Requirements
+```python
+{
+    'credit_limit_request_sent': fields.Boolean(
+        string='Credit Limit Request Sent', default=False, tracking=True
+    ),
+    'credit_limit_approved': fields.Boolean(
+        string='Credit Limit Approved', default=False, tracking=True
+    ),
+}
+```
+
+#### Method Signatures
+```python
+def action_request_credit_limit(self):
+    """Send credit limit approval request to Accounts Dept.
+    Only available when customer_type='credit'.
+    Sets credit_limit_request_sent=True and posts chatter message.
+    """
+    self.ensure_one()
+    if self.customer_type != 'credit':
+        raise UserError(_('Credit limit workflow is only for credit customers.'))
+    if self.credit_limit_request_sent:
+        raise UserError(_('Credit limit request already sent.'))
+    self.write({'credit_limit_request_sent': True})
+    self.message_post(body=_('Credit limit approval requested from Accounts Department.'))
+```
+
+---
+
+### FR-NEW-03 — Quotation 25-Day Expiry (GAP-03)
+
+**Priority:** Medium
+
+**User Story:** As a service manager, I want repair quotations to automatically expire after 25 days,
+so that stale quotations do not block the repair pipeline.
+
+#### Acceptance Criteria
+1. `quotation_expiry_date` computed Date field on `helpdesk.ticket` = SO creation date + 25 days.
+2. If the current date exceeds `quotation_expiry_date`, SO confirmation is blocked.
+3. An automation rule sets `quotation_expiry_date` on SO creation.
+4. Expired quotations display a warning to the user before any confirmation action.
+
+#### Business Rules
+- Expiry is calculated from the linked `sale_order` creation date.
+- If no SO exists, `quotation_expiry_date` is False (no expiry applies yet).
+- After expiry, a new quotation must be raised.
+
+#### Data Requirements
+```python
+{
+    'quotation_expiry_date': fields.Date(
+        string='Quotation Expiry Date',
+        compute='_compute_quotation_expiry_date',
+        store=True,
+        help='Automatically set to SO creation date + 25 days. '
+             'SO confirmation blocked after this date.'
+    ),
+}
+
+# Compute method
+@api.depends('sale_order', 'sale_order.create_date')
+def _compute_quotation_expiry_date(self):
+    for ticket in self:
+        if ticket.sale_order:
+            ticket.quotation_expiry_date = (
+                ticket.sale_order.create_date.date()
+                + timedelta(days=25)
+            )
+        else:
+            ticket.quotation_expiry_date = False
+```
+
+---
+
+### FR-NEW-04 — Insufficient Inventory Block (GAP-04)
+
+**Priority:** High
+
+**User Story:** As a service manager, I want to be warned and blocked when repair parts are
+insufficient in stock before confirming a quotation, so that I never commit to a repair without
+the required materials.
+
+#### Acceptance Criteria
+1. `insufficient_inventory` computed boolean on `helpdesk.ticket` — True when any item in the
+   `items` Many2many field has insufficient stock in the `repair_location` warehouse.
+2. When `insufficient_inventory = True`, a visible warning is displayed on the form.
+3. Quotation confirmation is blocked while `insufficient_inventory = True`.
+4. Availability is checked against `stock.quant` for the repair location.
+
+#### Business Rules
+- Uses `stock.quant` to check `quantity` vs 0 for each product in `items` at `repair_location`.
+- An empty `items` list means no block applies.
+- Re-computed when `items` or `repair_location` changes.
+
+#### Data Requirements
+```python
+{
+    'insufficient_inventory': fields.Boolean(
+        string='Insufficient Inventory',
+        compute='_compute_insufficient_inventory',
+        store=False,
+        help='True when any repair item has insufficient stock at the repair location.'
+    ),
+}
+```
+
+---
+
+### FR-NEW-05 — "Tested OK" Workflow (GAP-05)
+
+**Priority:** High
+
+**User Story:** As a factory technician, I want to mark a repair as "Tested OK" to bypass the
+quotation and invoicing workflow entirely when the item is repaired in-house at no charge, enabling
+immediate dispatch.
+
+#### Acceptance Criteria
+1. `tested_ok` boolean field on `helpdesk.ticket`.
+2. `action_tested_ok` method sets `tested_ok = True`, moves ticket to "Repair Completed" stage,
+   and enables dispatch immediately.
+3. This action bypasses quotation creation and invoicing.
+4. Button available only when `receive_at_factory = True` AND `fsm_task_done = False`.
+5. Once `tested_ok = True`, dispatch (`action_dispatch`) becomes available without payment checks.
+
+#### Business Rules
+- "Tested OK" is an express path for factory repairs where no charge is levied.
+- Cannot set `tested_ok` if `fsm_task_done = True` (repair already completed via FSM).
+- Dispatch gate for `tested_ok` repairs: available immediately (no `valid_invoiced_so` check).
+
+#### Data Requirements
+```python
+{
+    'tested_ok': fields.Boolean(string='Tested OK', default=False, tracking=True),
+}
+```
+
+#### Method Signature
+```python
+def action_tested_ok(self):
+    """Mark repair as Tested OK — bypasses quotation and invoicing.
+    Available when receive_at_factory=True and fsm_task_done=False.
+    Moves ticket to 'Repair Completed' stage.
+    """
+    self.ensure_one()
+    if not self.receive_at_factory:
+        raise UserError(_('Item must be received at factory before marking Tested OK.'))
+    if self.fsm_task_done:
+        raise UserError(_('Cannot mark Tested OK after FSM task is done.'))
+    repair_completed_stage = self.env['helpdesk.stage'].search(
+        [('name', '=', 'Repair Completed')], limit=1
+    )
+    self.write({
+        'tested_ok': True,
+        'stage_id': repair_completed_stage.id if repair_completed_stage else self.stage_id.id,
+    })
+```
+
+---
+
+### FR-NEW-06 — Mandatory Image Upload and Diagnosis Validation (GAP-06)
+
+**Priority:** High
+
+**User Story:** As a service manager, I want technicians to upload an image and validate their
+diagnosis before any products are added to a repair, so that repair work is always documented.
+
+#### Acceptance Criteria
+1. `image_uploaded` boolean — computed, True when `related_information` or `warranty_card` has
+   a value.
+2. `diagnosis_validated` boolean — manually set by the technician to confirm diagnosis is complete.
+3. `action_plan_intervention` additionally checks `image_uploaded = True` before proceeding.
+4. Adding products to the repair via the FSM task is blocked until `diagnosis_validated = True`.
+5. Both fields visible in the Repair Info tab.
+
+#### Business Rules
+- `image_uploaded` is computed (no manual set) — auto-True when either document field is filled.
+- `diagnosis_validated` must be manually confirmed by the technician.
+- `action_plan_intervention` updated guards: `receive_at_factory`, `repair_reason_id`,
+  AND `image_uploaded` must all be True.
+
+#### Data Requirements
+```python
+{
+    'image_uploaded': fields.Boolean(
+        string='Image Uploaded',
+        compute='_compute_image_uploaded',
+        store=True,
+    ),
+    'diagnosis_validated': fields.Boolean(
+        string='Diagnosis Validated', default=False, tracking=True
+    ),
+}
+
+@api.depends('related_information', 'warranty_card')
+def _compute_image_uploaded(self):
+    for ticket in self:
+        ticket.image_uploaded = bool(
+            ticket.related_information or ticket.warranty_card
+        )
+```
+
+---
+
+### FR-NEW-07 — Dispatch Button with Payment Gate (GAP-07)
+
+**Priority:** High
+
+**User Story:** As a service coordinator, I want a "Dispatch" button that enforces payment before
+releasing the repaired item, except for "Tested OK" repairs which can be dispatched immediately.
+
+#### Acceptance Criteria
+1. `dispatch_done` boolean (readonly) on `helpdesk.ticket` — set True when dispatch is complete.
+2. `action_dispatch` method:
+   - For cash customers (`customer_type = 'cash'`): blocked until `valid_invoiced_so = True`
+     (full invoice paid).
+   - For "Tested OK" repairs (`tested_ok = True`): dispatch available immediately.
+   - Sets `handed_over = True`, `dispatch_done = True`.
+   - Triggers a stock Return Operation from repair location to customer location.
+3. Button visible on the form after "Receive at Sales Centre" or "Tested OK".
+
+#### Business Rules
+- Cash: `valid_invoiced_so` must be True before dispatch.
+- Credit: `credit_limit_approved` must be True before dispatch.
+- Tested OK: no payment gate.
+- Dispatch creates a `stock.picking` (return operation) moving item from repair location to
+  customer location.
+
+#### Data Requirements
+```python
+{
+    'dispatch_done': fields.Boolean(
+        string='Dispatched', readonly=True, default=False, tracking=True
+    ),
+}
+```
+
+#### Method Signature
+```python
+def action_dispatch(self):
+    """Dispatch repaired item to customer.
+    Cash customers: requires valid_invoiced_so=True.
+    Tested OK repairs: no payment gate.
+    Sets handed_over=True, dispatch_done=True.
+    Creates stock Return Operation to customer location.
+    """
+    self.ensure_one()
+    if not self.tested_ok:
+        if self.customer_type == 'cash' and not self.valid_invoiced_so:
+            raise UserError(_('Full invoice must be paid before dispatch for cash customers.'))
+        if self.customer_type == 'credit' and not self.credit_limit_approved:
+            raise UserError(_('Credit limit must be approved before dispatch.'))
+    self.write({
+        'handed_over': True,
+        'dispatch_done': True,
+    })
+    # TODO: Create stock Return Operation picking from repair_location → customer location
+```
+
+---
+
+### FR-NEW-08 — 13 Stage Definitions (GAP-12)
+
+**Priority:** High
+
+**User Story:** As a system administrator, I want 13 standard repair stages seeded during module
+installation so that the repair pipeline is fully configured out of the box.
+
+#### Acceptance Criteria
+1. Module installation seeds exactly 13 `helpdesk.stage` records in `data/repair_stages.xml`.
+2. Stages in order:
+   1. New
+   2. Item Received
+   3. Sent to Factory
+   4. Received at Factory
+   5. Repair Started
+   6. Quotation
+   7. Quotation Sent to Customer
+   8. SO Confirmed
+   9. Repair Completed
+   10. Sent to Sales Centre
+   11. Received at Sales Centre
+   12. Dispatched
+   13. Handed Over to Customer
+3. Each stage has `sequence` values 10 through 130 (increments of 10).
+4. Stage "Handed Over to Customer" (stage 13) has `is_close = True`.
+
+#### Business Rules
+- All 13 stages are global (no `company_id`) on install; admins can restrict per-company later.
+- These stages correspond 1:1 to the workflow boolean flags tracked on `helpdesk.ticket`.
+
+---
+
+### FR-NEW-09 — Repair BOMs (GAP-14)
+
+**Priority:** Low
+
+**User Story:** As a service manager, I want to define repair Bill of Materials (BOMs) that
+technicians can apply as templates to auto-populate repair parts, reducing manual entry.
+
+#### Acceptance Criteria
+1. New model `jinstage.repair.bom` with fields: `name`, `repair_type_id` (Many2one to
+   `helpdesk.ticket.type`), `product_ids` (Many2many to `product.product`).
+2. A button "Apply BOM" on the FSM task or repair ticket populates the `items` field from the
+   selected BOM template.
+3. BOMs are managed under Helpdesk > Configuration > Repair BOMs (manager access only).
+
+#### Business Rules
+- Applying a BOM appends products to `items` (does not replace existing entries).
+- BOMs are optional — no mandatory use.
+- Access: manager group create/write/delete; user group read-only.
+
+#### Data Requirements
+```python
+class JinstageRepairBom(models.Model):
+    _name = 'jinstage.repair.bom'
+    _description = 'Repair Bill of Materials'
+    _order = 'name'
+
+    name = fields.Char(string='BOM Name', required=True)
+    repair_type_id = fields.Many2one(
+        'helpdesk.ticket.type', string='Repair Type'
+    )
+    product_ids = fields.Many2many(
+        'product.product', string='Standard Parts',
+        relation='jinstage_repair_bom_product_rel',
+        column1='bom_id', column2='product_id'
+    )
+```
 
 ---
 
@@ -1013,7 +1442,7 @@ searches.
 
 ### Odoo Stock Module (stock)
 
-- **Trigger Points:** `picking_id` field creation, `Create Repair Route` button action.
+- **Trigger Points:** `picking_id` field creation, `Create Return Transfer` button action.
 - **Data Exchange:** `stock.location` for all four location fields, `stock.lot` for serial
   tracking, `stock.picking` bidirectional link.
 - **Business Logic:** Repair route generates one or more `stock.picking` records;
@@ -1197,11 +1626,27 @@ searches.
 ## Success Criteria and Acceptance
 
 ### Functional Success Criteria
-1. All 20 functional requirements implemented and passing acceptance criteria.
-2. Three repair type workflows (A, B, C) complete end-to-end without errors.
+1. All 37 functional requirements (FR-001 to FR-014, FR-012b, FR-015–FR-022, FR-NEW-01 to
+   FR-NEW-09) implemented and passing acceptance criteria.
+2. All four repair type workflows (A: RUG, B: External not RUG, C: With Serial, D: Without Serial)
+   complete end-to-end without errors, using the correct factory-first movement order.
 3. All five PDF reports generate without errors for sample data.
-4. RUG approval workflow enforces stage gating correctly.
+4. RUG approval workflow enforces approval AFTER quotation and BEFORE SO confirmation.
 5. Cancel/Reopen audit trail fields are populated correctly on all cancel/reopen actions.
+6. `repair_reason_id` gate enforced: Plan Intervention blocked until reason is set.
+7. 50% advance invoice workflow documented and `advance_invoice_created` flag tracked.
+8. Customer type (cash/credit) payment gate enforced on dispatch.
+9. Credit limit approval workflow operational for credit customers exceeding credit limit.
+10. Quotation 25-day expiry blocks SO confirmation on expired quotations.
+11. Insufficient inventory check blocks quotation confirmation when stock is lacking.
+12. "Tested OK" path bypasses invoicing and enables immediate dispatch.
+13. Image upload and diagnosis validation enforced before plan intervention and product addition.
+14. 13 repair stages seeded on installation.
+15. RUG rejection correctly triggers repricing chatter message and sets `rug_repriced = False`.
+16. RUG final invoice routed to `rug_account_id` on the ticket type.
+17. "Without Serial No" serial creation uses `repair.temp.serial` sequence.
+18. Customer-declined cancel moves ticket to "Repair Completed" (not cancelled).
+19. `picking_count` smart button reflects all DOs (branch = 1, centre/factory = 3+). (GAP-13)
 
 ### Technical Success Criteria
 1. Module installs cleanly on a fresh Odoo 17 Enterprise database.

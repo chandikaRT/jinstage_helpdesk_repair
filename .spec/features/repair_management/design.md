@@ -71,7 +71,8 @@ jinstage_helpdesk_repair/
 │   ├── repair_reason.py
 │   ├── repair_reason_customer.py
 │   ├── repair_sub_reason.py
-│   └── repair_resolution.py
+│   ├── repair_resolution.py
+│   └── repair_bom.py                 # GAP-14: jinstage.repair.bom model
 ├── views/
 │   ├── helpdesk_ticket_views.xml   # Form, kanban, list view extensions
 │   ├── helpdesk_stage_views.xml    # Stage form/tree extensions
@@ -83,7 +84,8 @@ jinstage_helpdesk_repair/
 │   ├── ir.model.access.csv
 │   └── record_rules.xml
 ├── data/
-│   ├── ir_sequence_data.xml        # repair.seq definition
+│   ├── ir_sequence_data.xml        # repair.seq + repair.temp.serial (GAP-10)
+│   ├── repair_stages.xml           # 13 stage seed records (GAP-12)
 │   └── automation_rules.xml        # 3 automation rules
 ├── report/
 │   ├── report_actions.xml          # 5 ir.actions.report records
@@ -293,6 +295,67 @@ class HelpdeskTicket(models.Model):
     repair_reason_id = fields.Many2one(
         'jinstage.repair.reason', string='Repair Reason', tracking=True,
         help='Reason for repair. Required before planning an intervention (FR-013).'
+    )
+
+    # --- GAP-01: Customer Type Classification ---
+    customer_type = fields.Selection([
+        ('cash', 'Cash'),
+        ('credit', 'Credit'),
+    ], string='Customer Type', default='cash', tracking=True,
+       help='Cash: 50% advance + 100% final payment required before dispatch. '
+            'Credit: credit limit check required first.')
+
+    # --- GAP-02: Credit Limit Validation ---
+    credit_limit_request_sent = fields.Boolean(
+        string='Credit Limit Request Sent', default=False, tracking=True
+    )
+    credit_limit_approved = fields.Boolean(
+        string='Credit Limit Approved', default=False, tracking=True
+    )
+
+    # --- GAP-03: Quotation 25-Day Expiry ---
+    quotation_expiry_date = fields.Date(
+        string='Quotation Expiry Date',
+        compute='_compute_quotation_expiry_date',
+        store=True,
+        help='SO creation date + 25 days. SO confirmation blocked after this date.'
+    )
+
+    # --- GAP-04: Insufficient Inventory Block ---
+    insufficient_inventory = fields.Boolean(
+        string='Insufficient Inventory',
+        compute='_compute_insufficient_inventory',
+        store=False,
+        help='True when any item in the repair has insufficient stock at the repair location.'
+    )
+
+    # --- GAP-05: Tested OK Workflow ---
+    tested_ok = fields.Boolean(
+        string='Tested OK', default=False, tracking=True,
+        help='Factory repair marked as tested and complete. Bypasses quotation and invoicing.'
+    )
+
+    # --- GAP-06: Image Upload + Diagnosis Validation ---
+    image_uploaded = fields.Boolean(
+        string='Image Uploaded',
+        compute='_compute_image_uploaded',
+        store=True,
+        help='Auto-True when related_information or warranty_card is populated.'
+    )
+    diagnosis_validated = fields.Boolean(
+        string='Diagnosis Validated', default=False, tracking=True,
+        help='Manually set by technician. Required before adding products to repair.'
+    )
+
+    # --- GAP-07: Dispatch Done ---
+    dispatch_done = fields.Boolean(
+        string='Dispatched', readonly=True, default=False, tracking=True
+    )
+
+    # --- GAP-08: RUG Repricing flag ---
+    rug_repriced = fields.Boolean(
+        string='RUG Repriced', default=False, tracking=True,
+        help='Set True when pricing updated to standard rates after RUG rejection.'
     )
 
     # --- Audit & User Tracking ---
@@ -507,18 +570,46 @@ class HelpdeskTicket(models.Model):
         })
 
     def action_reject_rug(self):
-        """Reject RUG request (manager only)."""
+        """Reject RUG request (manager only).
+        GAP-08: Posts a chatter message indicating repricing to standard rates is required.
+        Sets rug_repriced=False to flag that repricing has not yet been done.
+        """
         self.ensure_one()
         if self.rug_approval_status != 'pending':
             raise UserError(_('RUG rejection is only possible when status is Pending.'))
         self.write({
             'rug_approval_status': 'rejected',
             'rug_approved': False,
+            'rug_repriced': False,
         })
+        self.message_post(body=_(
+            'RUG approval rejected. Pricing must be updated to standard repair rates '
+            'before the repair can proceed. Please revise the quotation accordingly.'
+        ))
 
     def action_cancel_ticket(self):
-        """Cancel the repair ticket with audit trail."""
+        """Cancel the repair ticket with audit trail.
+
+        GAP-11: When cancel_status='customer_declined' (customer declines quotation),
+        ticket moves to 'Repair Completed' stage instead of being marked cancelled.
+        cancelled=False in this path — treated as a completed (no-charge) repair.
+        A chatter message is posted. All other cancel reasons set cancelled=True normally.
+        """
         self.ensure_one()
+        if self.cancel_status == 'customer_declined':
+            # GAP-11: Customer declined quotation → move to Repair Completed, not cancelled
+            stage = self.env['helpdesk.stage'].search(
+                [('name', '=', 'Repair Completed')], limit=1
+            )
+            self.write({
+                'stage_id': stage.id if stage else self.stage_id.id,
+            })
+            self.message_post(body=_(
+                'Customer declined quotation. Ticket moved to Repair Completed. '
+                'Intervention Task must be marked Done manually. '
+                'Item returned via Sales Centre dispatch.'
+            ))
+            return
         if self.cancelled:
             raise UserError(_('Ticket is already cancelled.'))
         self.write({
@@ -575,9 +666,10 @@ class HelpdeskTicket(models.Model):
     def action_plan_intervention(self):
         """Open FSM task for repair intervention planning.
 
-        Guards (FR-014):
+        Guards (FR-014 + GAP-06):
         - receive_at_factory must be True (item is physically at factory)
         - repair_reason_id must be set (diagnosis recorded before work starts)
+        - image_uploaded must be True (GAP-06: image required before intervention)
 
         Sets repair_started_stage_updated = True on success.
         Delegates FSM task creation/view to helpdesk_fsm integration.
@@ -591,8 +683,103 @@ class HelpdeskTicket(models.Model):
             raise UserError(_(
                 'Please set a Repair Reason before planning an intervention.'
             ))
+        if not self.image_uploaded:
+            raise UserError(_(
+                'Please upload an image (warranty card or related information) '
+                'before planning an intervention.'
+            ))
         self.write({'repair_started_stage_updated': True})
         return self.action_view_fsm_tasks()
+
+    # --- GAP-03: Quotation 25-Day Expiry Computed Field ---
+    @api.depends('sale_order', 'sale_order.create_date')
+    def _compute_quotation_expiry_date(self):
+        from datetime import timedelta
+        for ticket in self:
+            if ticket.sale_order and ticket.sale_order.create_date:
+                ticket.quotation_expiry_date = (
+                    ticket.sale_order.create_date.date() + timedelta(days=25)
+                )
+            else:
+                ticket.quotation_expiry_date = False
+
+    # --- GAP-04: Insufficient Inventory Computed Field ---
+    @api.depends('items', 'repair_location')
+    def _compute_insufficient_inventory(self):
+        for ticket in self:
+            if not ticket.items or not ticket.repair_location:
+                ticket.insufficient_inventory = False
+                continue
+            quants = self.env['stock.quant'].search([
+                ('product_id', 'in', ticket.items.ids),
+                ('location_id', 'child_of', ticket.repair_location.id),
+            ])
+            quant_map = {q.product_id.id: q.quantity for q in quants}
+            ticket.insufficient_inventory = any(
+                quant_map.get(p.id, 0) <= 0 for p in ticket.items
+            )
+
+    # --- GAP-06: Image Uploaded Computed Field ---
+    @api.depends('related_information', 'warranty_card')
+    def _compute_image_uploaded(self):
+        for ticket in self:
+            ticket.image_uploaded = bool(
+                ticket.related_information or ticket.warranty_card
+            )
+
+    # --- GAP-02: Request Credit Limit ---
+    def action_request_credit_limit(self):
+        """Send credit limit approval request to Accounts Dept (GAP-02)."""
+        self.ensure_one()
+        if self.customer_type != 'credit':
+            raise UserError(_('Credit limit workflow is only for credit customers.'))
+        if self.credit_limit_request_sent:
+            raise UserError(_('Credit limit request already sent.'))
+        self.write({'credit_limit_request_sent': True})
+        self.message_post(body=_('Credit limit approval requested from Accounts Department.'))
+
+    # --- GAP-05: Tested OK ---
+    def action_tested_ok(self):
+        """Mark repair as Tested OK — express path bypassing quotation/invoicing (GAP-05).
+        Available when receive_at_factory=True and fsm_task_done=False.
+        """
+        self.ensure_one()
+        if not self.receive_at_factory:
+            raise UserError(_('Item must be received at factory before marking Tested OK.'))
+        if self.fsm_task_done:
+            raise UserError(_('Cannot mark Tested OK after FSM task is done.'))
+        stage = self.env['helpdesk.stage'].search(
+            [('name', '=', 'Repair Completed')], limit=1
+        )
+        self.write({
+            'tested_ok': True,
+            'stage_id': stage.id if stage else self.stage_id.id,
+        })
+
+    # --- GAP-07: Dispatch ---
+    def action_dispatch(self):
+        """Dispatch repaired item to customer (GAP-07).
+        Cash: requires valid_invoiced_so=True.
+        Tested OK: no payment gate.
+        Credit: requires credit_limit_approved=True.
+        Sets handed_over=True, dispatch_done=True.
+        Creates stock Return Operation: repair_location → customer location.
+        """
+        self.ensure_one()
+        if not self.tested_ok:
+            if self.customer_type == 'cash' and not self.valid_invoiced_so:
+                raise UserError(_(
+                    'Full invoice must be paid before dispatch for cash customers.'
+                ))
+            if self.customer_type == 'credit' and not self.credit_limit_approved:
+                raise UserError(_('Credit limit must be approved before dispatch.'))
+        if self.rug_confirmed and not self.rug_approved:
+            raise UserError(_('RUG approval required before dispatch.'))
+        self.write({
+            'handed_over': True,
+            'dispatch_done': True,
+        })
+        # TODO: Create stock Return Operation picking from repair_location → customer location
 ```
 
 ---
@@ -643,6 +830,13 @@ class HelpdeskTicketType(models.Model):
     is_without_serial_no = fields.Boolean(
         string='Without Serial No', default=False,
         help='Enable for non-serialised product repairs. Serial fields hidden on ticket form.'
+    )
+
+    # GAP-09: RUG Account — routes final RUG invoice to a specific GL account
+    rug_account_id = fields.Many2one(
+        'account.account', string='RUG Account',
+        help='GL account used for final RUG repair invoices. '
+             'Dispatch is blocked for RUG repairs until valid_invoiced_so=True and rug_approved=True.'
     )
 ```
 
@@ -796,6 +990,29 @@ class JinstageRepairResolution(models.Model):
 
 ---
 
+### 7. jinstage.repair.bom Model (GAP-14)
+
+```python
+class JinstageRepairBom(models.Model):
+    _name = 'jinstage.repair.bom'
+    _description = 'Repair Bill of Materials'
+    _order = 'name'
+
+    name = fields.Char(string='BOM Name', required=True)
+    repair_type_id = fields.Many2one(
+        'helpdesk.ticket.type', string='Repair Type',
+        help='Optional: restrict this BOM template to a specific repair type.'
+    )
+    product_ids = fields.Many2many(
+        'product.product', string='Standard Parts',
+        relation='jinstage_repair_bom_product_rel',
+        column1='bom_id', column2='product_id'
+    )
+    active = fields.Boolean(default=True)
+```
+
+---
+
 ## User Interface Design
 
 ### 1. Helpdesk Ticket Form View Extension
@@ -869,6 +1086,18 @@ class JinstageRepairResolution(models.Model):
             <button name="action_reopen_ticket" type="object"
                     string="Reopen"
                     invisible="cancelled == False"/>
+            <!-- 10. GAP-05: Tested OK — express path bypassing invoicing -->
+            <button name="action_tested_ok" type="object"
+                    string="Tested OK"
+                    invisible="tested_ok == True or receive_at_factory == False or fsm_task_done == True"/>
+            <!-- 11. GAP-02: Request Credit Limit -->
+            <button name="action_request_credit_limit" type="object"
+                    string="Request Credit Limit"
+                    invisible="customer_type != 'credit' or credit_limit_request_sent == True"/>
+            <!-- 12. GAP-07: Dispatch -->
+            <button name="action_dispatch" type="object"
+                    string="Dispatch" class="btn-primary"
+                    invisible="dispatch_done == True or (receive_at_centre == False and tested_ok == False)"/>
         </xpath>
 
         <!-- Main Tab: serial, warranty, driver info -->
@@ -1325,6 +1554,8 @@ access_repair_sub_reason_user,access_repair_sub_reason_user,model_jinstage_repai
 access_repair_sub_reason_manager,access_repair_sub_reason_manager,model_jinstage_repair_sub_reason,helpdesk.group_helpdesk_manager,1,1,1,1
 access_repair_resolution_user,access_repair_resolution_user,model_jinstage_repair_resolution,helpdesk.group_helpdesk_user,1,0,0,0
 access_repair_resolution_manager,access_repair_resolution_manager,model_jinstage_repair_resolution,helpdesk.group_helpdesk_manager,1,1,1,1
+access_repair_bom_user,access_repair_bom_user,model_jinstage_repair_bom,helpdesk.group_helpdesk_user,1,0,0,0
+access_repair_bom_manager,access_repair_bom_manager,model_jinstage_repair_bom,helpdesk.group_helpdesk_manager,1,1,1,1
 ```
 
 ### Record Rules (security/record_rules.xml)
@@ -1356,7 +1587,94 @@ access_repair_resolution_manager,access_repair_resolution_manager,model_jinstage
     <field name="use_date_range">False</field>
     <field name="company_id" eval="False"/>
 </record>
+
+<!-- GAP-10: Temporary Serial Sequence for "Without Serial No" repair type -->
+<record id="seq_repair_temp_serial" model="ir.sequence">
+    <field name="name">Repair Temp Serial</field>
+    <field name="code">repair.temp.serial</field>
+    <field name="prefix">REP/SER/%(year)s/</field>
+    <field name="padding">3</field>
+    <field name="number_increment">1</field>
+    <field name="use_date_range">False</field>
+    <field name="company_id" eval="False"/>
+</record>
 ```
+
+---
+
+## Repair Stage Seed Data (data/repair_stages.xml) — GAP-12
+
+Thirteen standard stages are seeded on module installation:
+
+```xml
+<!-- GAP-12: 13 standard repair ticket stages -->
+<record id="stage_new" model="helpdesk.stage">
+    <field name="name">New</field>
+    <field name="sequence">10</field>
+</record>
+<record id="stage_item_received" model="helpdesk.stage">
+    <field name="name">Item Received</field>
+    <field name="sequence">20</field>
+</record>
+<record id="stage_sent_to_factory" model="helpdesk.stage">
+    <field name="name">Sent to Factory</field>
+    <field name="sequence">30</field>
+</record>
+<record id="stage_received_at_factory" model="helpdesk.stage">
+    <field name="name">Received at Factory</field>
+    <field name="sequence">40</field>
+</record>
+<record id="stage_repair_started" model="helpdesk.stage">
+    <field name="name">Repair Started</field>
+    <field name="sequence">50</field>
+</record>
+<record id="stage_quotation" model="helpdesk.stage">
+    <field name="name">Quotation</field>
+    <field name="sequence">60</field>
+</record>
+<record id="stage_quotation_sent" model="helpdesk.stage">
+    <field name="name">Quotation Sent to Customer</field>
+    <field name="sequence">70</field>
+</record>
+<record id="stage_so_confirmed" model="helpdesk.stage">
+    <field name="name">SO Confirmed</field>
+    <field name="sequence">80</field>
+</record>
+<record id="stage_repair_completed" model="helpdesk.stage">
+    <field name="name">Repair Completed</field>
+    <field name="sequence">90</field>
+</record>
+<record id="stage_sent_to_sales_centre" model="helpdesk.stage">
+    <field name="name">Sent to Sales Centre</field>
+    <field name="sequence">100</field>
+</record>
+<record id="stage_received_at_sales_centre" model="helpdesk.stage">
+    <field name="name">Received at Sales Centre</field>
+    <field name="sequence">110</field>
+</record>
+<record id="stage_dispatched" model="helpdesk.stage">
+    <field name="name">Dispatched</field>
+    <field name="sequence">120</field>
+</record>
+<record id="stage_handed_over" model="helpdesk.stage">
+    <field name="name">Handed Over to Customer</field>
+    <field name="sequence">130</field>
+    <field name="is_close" eval="True"/>
+</record>
+```
+
+---
+
+## Multiple Delivery Orders Note (GAP-13)
+
+Branch repairs generate 1 Delivery Order. Centre/Factory repairs generate 3+ DOs:
+1. Branch → Factory (outbound)
+2. Factory → Sales Centre (outbound, after repair)
+3. Sales Centre → Customer (dispatch/return)
+
+The existing `picking_count` smart button on the ticket header shows the total count of all linked
+DOs. No additional model is required — `stock.picking.helpdesk_ticket_id` covers all legs.
+The smart button label "Repair Trans" with the total count provides full visibility.
 
 ---
 
@@ -1626,6 +1944,7 @@ if loc and loc.users_stock_location:
         'security/record_rules.xml',
         # Data
         'data/ir_sequence_data.xml',
+        'data/repair_stages.xml',     # GAP-12: 13 standard stages
         # Views
         'views/helpdesk_ticket_type_views.xml',
         'views/helpdesk_stage_views.xml',

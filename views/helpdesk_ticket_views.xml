@@ -24,6 +24,12 @@
                 <field name="repair_serial_created" invisible="1"/>
                 <field name="normal_repair_without_serial_no" invisible="1"/>
                 <field name="fsm_task_done" invisible="1"/>
+                <field name="tested_ok" invisible="1"/>
+                <field name="dispatch_done" invisible="1"/>
+                <field name="credit_limit_request_sent" invisible="1"/>
+                <field name="credit_limit_approved" invisible="1"/>
+                <field name="customer_type" invisible="1"/>
+                <field name="insufficient_inventory" invisible="1"/>
             </xpath>
 
             <!-- Action Buttons in header
@@ -98,6 +104,31 @@
                         class="btn-secondary"
                         invisible="receive_at_centre or not send_to_centre"/>
 
+                <!-- Tested OK: bypass quotation for no-parts repairs -->
+                <button name="action_tested_ok"
+                        string="Tested OK"
+                        type="object"
+                        class="btn-success"
+                        invisible="tested_ok or not receive_at_factory"/>
+                <!-- Dispatch: final handover to customer -->
+                <button name="action_dispatch"
+                        string="Dispatch"
+                        type="object"
+                        class="btn-primary"
+                        invisible="dispatch_done or (not tested_ok and not receive_at_centre)"/>
+                <!-- Credit Limit Request -->
+                <button name="action_request_credit_limit"
+                        string="Request Credit Limit"
+                        type="object"
+                        class="btn-secondary"
+                        invisible="customer_type != 'credit' or credit_limit_request_sent"/>
+                <button name="action_approve_credit_limit"
+                        string="Approve Credit Limit"
+                        type="object"
+                        class="btn-success"
+                        groups="helpdesk.group_helpdesk_manager"
+                        invisible="customer_type != 'credit' or not credit_limit_request_sent or credit_limit_approved"/>
+
                 <!-- Cancel / Reopen -->
                 <button name="action_cancel_ticket"
                         string="Cancel"
@@ -147,6 +178,19 @@
                         <field name="repair_reason_id"
                                attrs="{'required': [('receive_at_factory', '=', True)]}"/>
                     </group>
+                    <group string="Customer &amp; Financial">
+                        <field name="customer_type"/>
+                        <field name="quotation_expiry_date"/>
+                        <field name="advance_invoice_created" readonly="1"/>
+                        <field name="credit_limit_request_sent" readonly="1" invisible="customer_type != 'credit'"/>
+                        <field name="credit_limit_approved" readonly="1" invisible="customer_type != 'credit'"/>
+                    </group>
+                    <group string="Technical Validation">
+                        <field name="image_uploaded"/>
+                        <field name="diagnosis_validated"/>
+                        <field name="tested_ok" readonly="1"/>
+                        <field name="dispatch_done" readonly="1"/>
+                    </group>
                     <group string="Logistics">
                         <field name="driver_name"/>
                         <field name="vehicle_details"/>
@@ -165,6 +209,12 @@
                         <field name="warranty_card" widget="image" nolabel="1"/>
                         <field name="related_information" widget="image" nolabel="1"/>
                     </group>
+                    <div class="alert alert-warning" role="alert"
+                         invisible="not insufficient_inventory">
+                        <strong>Insufficient Inventory:</strong>
+                        One or more required parts are not available in the repair warehouse.
+                        Quotation confirmation is blocked until parts are available.
+                    </div>
                 </page>
             </xpath>
 

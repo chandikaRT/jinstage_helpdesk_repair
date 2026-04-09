@@ -21,3 +21,7 @@ class HelpdeskTicketType(models.Model):
         string='Without Serial No', default=False,
         help='Enable for non-serialised repairs. Serial fields hidden on ticket form.'
     )
+    rug_account_id = fields.Many2one(
+        'account.account', string='RUG Invoice Account',
+        help='Account to use for the final invoice on RUG repairs.'
+    )
