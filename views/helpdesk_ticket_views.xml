@@ -176,7 +176,20 @@
                     </group>
                     <group string="Repair Details">
                         <field name="repair_reason_id"
-                               attrs="{'required': [('receive_at_factory', '=', True)]}"/>
+                               required="receive_at_factory"/>
+                    </group>
+                    <group string="Customer &amp; Financial">
+                        <field name="customer_type"/>
+                        <field name="quotation_expiry_date"/>
+                        <field name="advance_invoice_created" readonly="1"/>
+                        <field name="credit_limit_request_sent" readonly="1" invisible="customer_type != 'credit'"/>
+                        <field name="credit_limit_approved" readonly="1" invisible="customer_type != 'credit'"/>
+                    </group>
+                    <group string="Technical Validation">
+                        <field name="image_uploaded"/>
+                        <field name="diagnosis_validated"/>
+                        <field name="tested_ok" readonly="1"/>
+                        <field name="dispatch_done" readonly="1"/>
                     </group>
                     <group string="Customer &amp; Financial">
                         <field name="customer_type"/>
