@@ -3,7 +3,7 @@
     <record id="view_project_task_repair_form" model="ir.ui.view">
         <field name="name">project.task.repair.form</field>
         <field name="model">project.task</field>
-        <field name="inherit_id" ref="industry_fsm.project_task_view_form_fsm_deadline"/>
+        <field name="inherit_id" ref="project.view_task_form2"/>
         <field name="arch" type="xml">
 
             <!-- Header buttons -->

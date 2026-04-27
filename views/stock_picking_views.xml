@@ -7,7 +7,7 @@
         <field name="arch" type="xml">
 
             <!-- Repair ticket fields in Additional Info tab -->
-            <xpath expr="//page[@name='extra_info']" position="inside">
+            <xpath expr="//page[@name='extra']" position="inside">
                 <separator string="Repair Information"/>
                 <group>
                     <field name="helpdesk_ticket_id" readonly="1"/>

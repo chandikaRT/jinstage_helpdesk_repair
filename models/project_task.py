@@ -30,13 +30,11 @@ class ProjectTask(models.Model):
         string='Quotation Type', compute='_compute_repair_fields', store=False
     )
 
-    @api.depends('helpdesk_ticket_ids')
+    @api.depends('helpdesk_ticket_id')
     def _compute_repair_fields(self):
-        task_fields = self.env['project.task']._fields
-        has_ticket_ids = 'helpdesk_ticket_ids' in task_fields
-        has_sale_order = 'sale_order_id' in task_fields
+        has_sale_order = 'sale_order_id' in self.env['project.task']._fields
         for task in self:
-            ticket = task.helpdesk_ticket_ids[:1] if has_ticket_ids else self.env['helpdesk.ticket']
+            ticket = task.helpdesk_ticket_id
             task.material_availability = ticket.material_availability if ticket else False
             so = task.sale_order_id if has_sale_order else False
             if so and hasattr(so, 'quotation_type') and so.quotation_type:
@@ -53,11 +51,10 @@ class ProjectTask(models.Model):
     def action_repair_tested_ok(self):
         """Mark the linked helpdesk ticket as Tested OK."""
         self.ensure_one()
-        has_ticket_ids = 'helpdesk_ticket_ids' in self.env['project.task']._fields
-        tickets = self.helpdesk_ticket_ids if has_ticket_ids else self.env['helpdesk.ticket']
-        if not tickets:
+        ticket = self.helpdesk_ticket_id
+        if not ticket:
             raise UserError(_('No helpdesk ticket linked to this task.'))
-        tickets[0].action_tested_ok()
+        ticket.action_tested_ok()
 
     def action_view_repair_diagnosis_validation(self):
         """Open the repair diagnosis lines for this task."""
