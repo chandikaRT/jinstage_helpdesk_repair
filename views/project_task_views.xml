@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_project_task_repair_form" model="ir.ui.view">
+        <field name="name">project.task.repair.form</field>
+        <field name="model">project.task</field>
+        <field name="inherit_id" ref="industry_fsm.project_task_view_form_fsm_deadline"/>
+        <field name="arch" type="xml">
+
+            <!-- Header buttons -->
+            <xpath expr="//header" position="inside">
+                <button name="action_view_repair_diagnosis_validation"
+                        string="View Repair Diagnosis Validation"
+                        type="object"
+                        class="btn-secondary"/>
+                <button name="action_view_repair_image_validation"
+                        string="View Repair Image Validation"
+                        type="object"
+                        class="btn-secondary"/>
+                <button name="action_repair_tested_ok"
+                        string="Tested OK"
+                        type="object"
+                        class="btn-success"/>
+            </xpath>
+
+            <!-- Extra fields in the right column (after standard FSM fields) -->
+            <xpath expr="//notebook" position="before">
+                <group>
+                    <group>
+                        <field name="material_availability" readonly="1"/>
+                        <field name="quotation_type" readonly="1"/>
+                    </group>
+                </group>
+            </xpath>
+
+            <!-- Tabs: Repair Image | Warranty Details | Repair Diagnosis -->
+            <xpath expr="//notebook" position="inside">
+                <page name="repair_image" string="Repair Image">
+                    <group>
+                        <group string="Repair Image 01">
+                            <field name="repair_image_01" widget="image" nolabel="1"/>
+                        </group>
+                        <group string="Repair Image 02">
+                            <field name="repair_image_02" widget="image" nolabel="1"/>
+                        </group>
+                    </group>
+                </page>
+                <page name="task_warranty_details" string="Warranty Details">
+                    <group>
+                        <group string="Warranty Card">
+                            <field name="warranty_card" widget="image" nolabel="1"/>
+                        </group>
+                        <group string="Related Information">
+                            <field name="related_information" widget="image" nolabel="1"/>
+                        </group>
+                    </group>
+                </page>
+                <page name="repair_diagnosis" string="Repair Diagnosis">
+                    <field name="repair_diagnosis_ids" nolabel="1">
+                        <tree editable="bottom">
+                            <field name="sequence" widget="handle"/>
+                            <field name="description"/>
+                            <field name="diagnosis_area_id"/>
+                            <field name="diagnosis_code_id"/>
+                            <field name="reason_id"/>
+                            <field name="sub_reason_id"/>
+                            <field name="resolution_id"/>
+                            <field name="repair_stage_id"/>
+                        </tree>
+                    </field>
+                </page>
+            </xpath>
+
+        </field>
+    </record>
+</odoo>
