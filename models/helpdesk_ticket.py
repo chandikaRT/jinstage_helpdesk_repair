@@ -34,6 +34,12 @@ class HelpdeskTicket(models.Model):
     repair_reason_id = fields.Many2one(
         'jinstage.repair.reason', string='Repair Reason', tracking=True
     )
+    repair_reason_ids = fields.Many2many(
+        'jinstage.repair.reason',
+        relation='helpdesk_ticket_repair_reason_rel',
+        column1='ticket_id', column2='reason_id',
+        string='Repair Reasons', tracking=True
+    )
     customer_type = fields.Selection([
         ('cash', 'Cash Customer'),
         ('credit', 'Credit Customer'),
@@ -514,7 +520,7 @@ class HelpdeskTicket(models.Model):
         self.ensure_one()
         if not self.receive_at_factory:
             raise UserError(_('Item must be received at factory before planning intervention.'))
-        if not self.repair_reason_id:
+        if not self.repair_reason_ids and not self.repair_reason_id:
             raise UserError(_(
                 'Repair Reason is required before planning the intervention. '
                 'Please set the Repair Reason field.'

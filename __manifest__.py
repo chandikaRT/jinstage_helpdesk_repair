@@ -1,6 +1,6 @@
 {
     'name': 'JinStage Helpdesk Repair Management',
-    'version': '17.0.1.0.0',
+    'version': '17.0.1.1.0',
     'category': 'Helpdesk',
     'summary': 'Extends Helpdesk into a full Repair Management System',
     'author': 'Jinasena Pvt Ltd',
@@ -30,6 +30,9 @@
         'views/helpdesk_stage_views.xml',
         'views/diagnosis_views.xml',
         'views/helpdesk_ticket_views.xml',
+        'views/project_task_views.xml',
+        'views/sale_order_views.xml',
+        'views/stock_picking_views.xml',
         'views/actions.xml',
         'views/menus.xml',
 

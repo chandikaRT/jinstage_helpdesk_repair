@@ -15,3 +15,9 @@ from . import helpdesk_stage
 from . import helpdesk_ticket
 from . import stock_picking
 from . import stock_location
+
+# Phase 3: New model extensions
+from . import repair_diagnosis_line
+from . import project_task
+from . import sale_order
+from . import account_move

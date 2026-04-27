@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_sale_order_repair_form" model="ir.ui.view">
+        <field name="name">sale.order.repair.form</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_quotation_form"/>
+        <field name="arch" type="xml">
+
+            <!-- Request RUG Approval button — visible when RUG Confirmed but not yet approved -->
+            <xpath expr="//header/button[1]" position="before">
+                <button name="action_request_rug_approval"
+                        string="Request RUG Approval"
+                        type="object"
+                        class="btn-secondary"
+                        invisible="not rug_confirmed or rug_approved"/>
+            </xpath>
+
+            <!-- Custom repair fields in the right info column -->
+            <xpath expr="//field[@name='partner_id']" position="after">
+                <field name="order_payment_type"/>
+                <field name="quotation_type"/>
+                <field name="repair_task_id"/>
+                <field name="repair_reason_id"/>
+                <field name="rug_confirmed"/>
+                <field name="rug_approved" readonly="1"/>
+                <field name="re_estimate_request_count" readonly="1"/>
+                <field name="re_estimate_count" readonly="1"/>
+                <field name="reject_reason"/>
+            </xpath>
+
+            <!-- Extra tabs: Credit Limit Details | Repair Image | Warranty Details -->
+            <xpath expr="//notebook" position="inside">
+                <page name="credit_limit_details" string="Credit Limit Details">
+                    <group>
+                        <group>
+                            <field name="credit_limit_amount"/>
+                            <field name="credit_outstanding"/>
+                        </group>
+                        <group>
+                            <field name="credit_limit_request_sent" readonly="1"/>
+                            <field name="credit_limit_approved" readonly="1"/>
+                        </group>
+                    </group>
+                </page>
+                <page name="so_repair_image" string="Repair Image">
+                    <group>
+                        <group string="Repair Image 01">
+                            <field name="repair_image_01" widget="image" nolabel="1"/>
+                        </group>
+                        <group string="Repair Image 02">
+                            <field name="repair_image_02" widget="image" nolabel="1"/>
+                        </group>
+                    </group>
+                </page>
+                <page name="so_warranty_details" string="Warranty Details">
+                    <group>
+                        <group string="Warranty Card">
+                            <field name="warranty_card" widget="image" nolabel="1"/>
+                        </group>
+                        <group string="Related Information">
+                            <field name="related_information" widget="image" nolabel="1"/>
+                        </group>
+                    </group>
+                </page>
+            </xpath>
+
+        </field>
+    </record>
+</odoo>

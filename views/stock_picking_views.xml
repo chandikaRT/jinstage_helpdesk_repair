@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_stock_picking_repair_form" model="ir.ui.view">
+        <field name="name">stock.picking.repair.form</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.view_picking_form"/>
+        <field name="arch" type="xml">
+
+            <!-- Repair ticket fields in Additional Info tab -->
+            <xpath expr="//page[@name='extra_info']" position="inside">
+                <separator string="Repair Information"/>
+                <group>
+                    <field name="helpdesk_ticket_id" readonly="1"/>
+                    <field name="ticket_sale_order_id" readonly="1"/>
+                    <field name="quotation_type" readonly="1"/>
+                    <field name="validation_note"/>
+                </group>
+            </xpath>
+
+        </field>
+    </record>
+
+    <!-- Account Move: UPDATE RUG ACCOUNT button -->
+    <record id="view_account_move_repair_form" model="ir.ui.view">
+        <field name="name">account.move.repair.form</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_move_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header/button[1]" position="before">
+                <field name="is_rug_invoice" invisible="1"/>
+                <button name="action_update_rug_account"
+                        string="Update RUG Account"
+                        type="object"
+                        class="btn-secondary"
+                        invisible="is_rug_invoice or state != 'draft'"/>
+            </xpath>
+            <xpath expr="//field[@name='invoice_date']" position="after">
+                <field name="rug_account_id" invisible="not is_rug_invoice"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
