@@ -12,6 +12,7 @@ from . import repair_resolution
 # Phase 2: Core model extensions
 from . import helpdesk_ticket_type
 from . import helpdesk_stage
+from . import helpdesk_team
 from . import helpdesk_ticket
 from . import stock_picking
 from . import stock_location
