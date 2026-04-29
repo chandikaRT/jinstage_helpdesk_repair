@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Seed the repair helpdesk team so stages can reference it.
+             noupdate="1" means this is only created on first install;
+             renaming it in the UI will not be overwritten on upgrade. -->
+        <record id="helpdesk_team_repair" model="helpdesk.team">
+            <field name="name">Customer Care - Repair</field>
+            <field name="use_helpdesk_fsm" eval="True"/>
+            <field name="use_helpdesk_sale" eval="True"/>
+        </record>
+    </data>
+</odoo>
