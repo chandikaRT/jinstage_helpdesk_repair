@@ -6,8 +6,7 @@
              renaming it in the UI will not be overwritten on upgrade. -->
         <record id="helpdesk_team_repair" model="helpdesk.team">
             <field name="name">Customer Care - Repair</field>
-            <field name="use_helpdesk_fsm" eval="True"/>
-            <field name="use_helpdesk_sale" eval="True"/>
+            <field name="use_fsm" eval="True"/>
         </record>
     </data>
 </odoo>
