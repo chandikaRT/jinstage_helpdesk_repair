@@ -22,6 +22,7 @@
 
         # --- Master / sequence data ---
         'data/ir_sequence_data.xml',
+        'data/helpdesk_team_data.xml',
         'data/repair_ticket_types.xml',
         'data/repair_stages.xml',
 
