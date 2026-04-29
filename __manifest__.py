@@ -25,6 +25,7 @@
         'data/helpdesk_team_data.xml',
         'data/repair_ticket_types.xml',
         'data/repair_stages.xml',
+        'data/link_stages.xml',
 
         # --- Views ---
         'views/helpdesk_ticket_type_views.xml',

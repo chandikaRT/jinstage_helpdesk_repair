@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Runs on every install AND upgrade (noupdate="0").
+         Links all repair stages to every existing helpdesk team so they
+         appear in the kanban and statusbar regardless of which team is selected. -->
+    <data noupdate="0">
+        <function model="helpdesk.team" name="_link_repair_stages_to_all_teams"/>
+    </data>
+</odoo>

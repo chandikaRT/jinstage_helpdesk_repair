@@ -28,11 +28,27 @@ class HelpdeskTeam(models.Model):
 
     def _add_repair_stages_to_teams(self, teams):
         """Link all repair stages to the given teams."""
+        stages = self._get_repair_stages()
+        if stages:
+            for team in teams:
+                team.write({'stage_ids': [(4, s.id) for s in stages]})
+
+    @api.model
+    def _get_repair_stages(self):
+        """Return all repair stage records."""
         stages = self.env['helpdesk.stage']
         for xml_id in REPAIR_STAGE_XML_IDS:
             stage = self.env.ref(xml_id, raise_if_not_found=False)
             if stage:
                 stages |= stage
-        if stages:
-            for team in teams:
-                team.write({'stage_ids': [(4, s.id) for s in stages]})
+        return stages
+
+    @api.model
+    def _link_repair_stages_to_all_teams(self):
+        """Link all repair stages to every existing team. Called on install and update."""
+        stages = self._get_repair_stages()
+        if not stages:
+            return
+        teams = self.search([])
+        for team in teams:
+            team.write({'stage_ids': [(4, s.id) for s in stages]})
